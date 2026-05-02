@@ -1,17 +1,19 @@
 Host the web UI (HTML/JS/CSS) somewhere. Supabase only hosts your database/APIs — not this static app.
 
-Quickest free option — GitHub Pages (workflow already in repo):
+GitHub Pages (workflow: .github/workflows/deploy-pages.yml)
 
-  1) Create a new empty repository on GitHub (no README).
-  2) In this folder run:
-       git remote add origin https://github.com/YOU/REPO.git
+  1) On https://github.com/new create a repository (e.g. MTGapp), empty — no README, no .gitignore.
+  2) In this project folder:
+       git remote add origin https://github.com/YOUR_USER/MTGapp.git
        git push -u origin main
-  3) On GitHub: Settings → Pages → Build and deployment → Source: GitHub Actions.
-  4) Open the Actions tab; when the deploy workflow finishes, Pages shows the live URL
-     (typically https://YOU.github.io/REPO/).
+     (Use SSH git@github.com:... instead if that is how you authenticate.)
+  3) GitHub → your repo → Settings → Pages → Build and deployment → Source: GitHub Actions.
+     (Pick “GitHub Actions”, not “Deploy from a branch”.)
+  4) Actions tab → open “Deploy static site to Pages” → wait for green; refresh Settings → Pages
+     for the public URL (usually https://YOUR_USER.github.io/MTGapp/).
 
-  Then in Supabase → Authentication → URL Configuration, set Site URL to that live URL
-  and add the same URL under Redirect URLs (wildcard ok: https://YOU.github.io/REPO/**).
+  Supabase → Authentication → URL Configuration: set Site URL to that Pages URL; add Redirect URL
+  https://YOUR_USER.github.io/MTGapp/** (and http://localhost:PORT/** for local serve.py if you use it).
 
 Supabase project: enable Auth → Providers → Anonymous (this app uses anonymous sign-in).
 Schema is already applied if you used the Supabase MCP migration.
