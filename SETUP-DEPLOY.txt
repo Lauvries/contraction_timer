@@ -1,25 +1,26 @@
-Automated deploy (you still need cloud accounts once — nobody can create those for you)
+Host the web UI (HTML/JS/CSS) somewhere. Supabase only hosts your database/APIs — not this static app.
 
-Supabase (free): https://supabase.com — new project, enable Auth → Providers → Anonymous,
-run supabase/schema.sql in SQL → New query.
+Quickest free option — GitHub Pages (workflow already in repo):
 
-Netlify (free): create empty site; get Site ID (Site configuration → Site details).
-Create a personal access token (User settings → Applications).
+  1) Create a new empty repository on GitHub (no README).
+  2) In this folder run:
+       git remote add origin https://github.com/YOU/REPO.git
+       git push -u origin main
+  3) On GitHub: Settings → Pages → Build and deployment → Source: GitHub Actions.
+  4) Open the Actions tab; when the deploy workflow finishes, Pages shows the live URL
+     (typically https://YOU.github.io/REPO/).
 
-Then pick ONE:
+  Then in Supabase → Authentication → URL Configuration, set Site URL to that live URL
+  and add the same URL under Redirect URLs (wildcard ok: https://YOU.github.io/REPO/**).
 
-  A) GitHub Actions — push this repo to GitHub; add repository secrets:
-     NETLIFY_AUTH_TOKEN, NETLIFY_SITE_ID, SUPABASE_URL, SUPABASE_ANON_KEY.
-     Workflow: .github/workflows/deploy-netlify.yml (on push to main/master).
+Supabase project: enable Auth → Providers → Anonymous (this app uses anonymous sign-in).
+Schema is already applied if you used the Supabase MCP migration.
 
-  B) Netlify “link repo” — connect the GitHub repo to Netlify; set the same two
-     Supabase variables as “Build environment variables” (Netlify runs `npm run build`,
-     see netlify.toml). Complete Supabase SQL + Anonymous as above once.
+---
 
-  C) Paste secrets into chat and ask the agent to run deploy — you must already have
-     run `netlify login` in a terminal once, or provide NETLIFY_AUTH_TOKEN locally.
+Netlify (free): create empty site; optional workflow .github/workflows/deploy-netlify.yml
+needs secrets NETLIFY_AUTH_TOKEN, NETLIFY_SITE_ID, SUPABASE_URL, SUPABASE_ANON_KEY; or
+link the repo in Netlify UI with build env vars (see netlify.toml).
 
-Local: npm run build sets supabase-config.js from env SUPABASE_URL / SUPABASE_ANON_KEY
-(empty env → empty strings → app works offline with browser storage only).
-
-Local test: python3 serve.py (use http://, not file://).
+Local: npm run build injects supabase-config.js when SUPABASE_URL / SUPABASE_ANON_KEY are set.
+Local test: python3 serve.py (http://, not file://).
