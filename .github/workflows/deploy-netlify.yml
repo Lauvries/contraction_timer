@@ -1,16 +1,15 @@
-# One-time: add secrets in GitHub → Settings Secrets and variables → Actions
+# Optional Netlify deploy — does NOT run on git push (use GitHub Pages for that).
+# Run manually: Actions → Deploy to Netlify → Run workflow
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
 #   NETLIFY_AUTH_TOKEN  Netlify → User settings → Applications → Personal access tokens
 #   NETLIFY_SITE_ID     Site → Site configuration → Site details → Site ID
 #   SUPABASE_URL        Supabase → Project Settings → API → Project URL
 #   SUPABASE_ANON_KEY   Supabase → Project Settings → API → anon public
-#
-# Supabase one-time: enable Authentication → Anonymous; run supabase/schema.sql in SQL editor.
 
 name: Deploy to Netlify
 
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:

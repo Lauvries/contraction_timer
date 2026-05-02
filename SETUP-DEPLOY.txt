@@ -20,9 +20,9 @@ Schema is already applied if you used the Supabase MCP migration.
 
 ---
 
-Netlify (free): create empty site; optional workflow .github/workflows/deploy-netlify.yml
-needs secrets NETLIFY_AUTH_TOKEN, NETLIFY_SITE_ID, SUPABASE_URL, SUPABASE_ANON_KEY; or
-link the repo in Netlify UI with build env vars (see netlify.toml).
+Netlify (optional): workflow .github/workflows/deploy-netlify.yml runs only when you start it
+manually (Actions → Deploy to Netlify → Run workflow). Add the secrets above first, or use
+Netlify’s own “connect GitHub repo” flow instead.
 
 Local: npm run build injects supabase-config.js when SUPABASE_URL / SUPABASE_ANON_KEY are set.
 Local test: python3 serve.py (http://, not file://).
