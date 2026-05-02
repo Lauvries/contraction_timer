@@ -1,0 +1,9 @@
+{
+  "name": "contraction-timer",
+  "private": true,
+  "scripts": {
+    "start": "python3 serve.py",
+    "build": "node scripts/write-supabase-config.mjs",
+    "deploy:netlify": "npm run build && npx --yes netlify-cli deploy --prod"
+  }
+}

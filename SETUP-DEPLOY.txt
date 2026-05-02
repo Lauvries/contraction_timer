@@ -1,0 +1,25 @@
+Automated deploy (you still need cloud accounts once — nobody can create those for you)
+
+Supabase (free): https://supabase.com — new project, enable Auth → Providers → Anonymous,
+run supabase/schema.sql in SQL → New query.
+
+Netlify (free): create empty site; get Site ID (Site configuration → Site details).
+Create a personal access token (User settings → Applications).
+
+Then pick ONE:
+
+  A) GitHub Actions — push this repo to GitHub; add repository secrets:
+     NETLIFY_AUTH_TOKEN, NETLIFY_SITE_ID, SUPABASE_URL, SUPABASE_ANON_KEY.
+     Workflow: .github/workflows/deploy-netlify.yml (on push to main/master).
+
+  B) Netlify “link repo” — connect the GitHub repo to Netlify; set the same two
+     Supabase variables as “Build environment variables” (Netlify runs `npm run build`,
+     see netlify.toml). Complete Supabase SQL + Anonymous as above once.
+
+  C) Paste secrets into chat and ask the agent to run deploy — you must already have
+     run `netlify login` in a terminal once, or provide NETLIFY_AUTH_TOKEN locally.
+
+Local: npm run build sets supabase-config.js from env SUPABASE_URL / SUPABASE_ANON_KEY
+(empty env → empty strings → app works offline with browser storage only).
+
+Local test: python3 serve.py (use http://, not file://).
