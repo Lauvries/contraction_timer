@@ -252,6 +252,23 @@ body.app-loading .main-btn {
   color: var(--danger);
 }
 
+.login-field-wrap {
+  width: 100%;
+}
+
+.login-dialog .options-actions {
+  justify-content: stretch;
+  margin-top: 0.35rem;
+}
+
+.login-submit {
+  width: 100%;
+}
+
+.login-error {
+  color: var(--danger);
+}
+
 .timer-zone {
   display: flex;
   flex-direction: column;

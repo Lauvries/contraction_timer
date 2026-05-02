@@ -24,6 +24,13 @@ const clearTargetBtn = document.getElementById("clearTarget");
 const liveTimerToggle = document.getElementById("liveTimerToggle");
 const timerModeHint = document.getElementById("timerModeHint");
 const syncStatusEl = document.getElementById("syncStatus");
+const loginDialog = document.getElementById("loginDialog");
+const loginForm = document.getElementById("loginForm");
+const loginEmailInput = document.getElementById("loginEmail");
+const loginPasswordInput = document.getElementById("loginPassword");
+const loginErrorEl = document.getElementById("loginError");
+const loginSubmitBtn = document.getElementById("loginSubmit");
+const signOutBtn = document.getElementById("signOutBtn");
 
 /** @type {string | null} */
 let editingTimeId = null;
@@ -233,14 +240,62 @@ function loadContractions() {
   return loadContractionsFromLocalStorage();
 }
 
-async function ensureCloudAuth() {
+function setLoginError(text) {
+  if (!loginErrorEl) return;
+  if (!text) {
+    loginErrorEl.hidden = true;
+    loginErrorEl.textContent = "";
+    return;
+  }
+  loginErrorEl.hidden = false;
+  loginErrorEl.textContent = text;
+}
+
+function showLoginModal() {
+  setLoginError("");
+  if (loginDialog && typeof loginDialog.showModal === "function") {
+    loginDialog.showModal();
+    loginEmailInput?.focus();
+  }
+}
+
+function updateSignOutVisibility(signedIn) {
+  if (!signOutBtn) return;
+  signOutBtn.hidden = !useCloud() || !signedIn;
+}
+
+async function loadCloudDataAfterAuth() {
   if (!supabase) return;
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (session) return;
-  const { error } = await supabase.auth.signInAnonymously();
-  if (error) throw error;
+  await pullCloudContractions();
+  await migrateLocalToCloudIfNeeded();
+  setSyncMessage("");
+  updateSignOutVisibility(true);
+  if (loginDialog && loginDialog.open) loginDialog.close();
+  renderHistory();
+  renderStats();
+}
+
+async function submitLogin() {
+  if (!supabase || !loginEmailInput || !loginPasswordInput) return;
+  const email = loginEmailInput.value.trim();
+  const password = loginPasswordInput.value;
+  if (!email || !password) {
+    setLoginError("Enter email and password.");
+    return;
+  }
+  setLoginError("");
+  loginSubmitBtn.disabled = true;
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setLoginError(error.message || "Sign-in failed.");
+      return;
+    }
+    loginPasswordInput.value = "";
+    await loadCloudDataAfterAuth();
+  } finally {
+    loginSubmitBtn.disabled = false;
+  }
 }
 
 async function pullCloudContractions() {
@@ -892,6 +947,29 @@ optionsDialog.addEventListener("click", (e) => {
   if (e.target === optionsDialog) optionsDialog.close();
 });
 
+loginForm?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  void submitLogin();
+});
+
+loginDialog?.addEventListener("cancel", (e) => {
+  e.preventDefault();
+});
+
+signOutBtn?.addEventListener("click", () => void signOutCloud());
+
+async function signOutCloud() {
+  if (!supabase) return;
+  await supabase.auth.signOut();
+  cloudContractions = [];
+  updateSignOutVisibility(false);
+  optionsDialog.close();
+  renderHistory();
+  renderStats();
+  setSyncMessage("Sign in to sync your list.");
+  showLoginModal();
+}
+
 async function bootstrap() {
   document.body.classList.add("app-loading");
   setSyncMessage("");
@@ -899,17 +977,45 @@ async function bootstrap() {
     if (useCloud()) {
       setSyncMessage("Loading your data…");
       supabase = createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY, {
-        auth: { persistSession: true, autoRefreshToken: true },
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
       });
-      await ensureCloudAuth();
-      await pullCloudContractions();
-      await migrateLocalToCloudIfNeeded();
-      setSyncMessage("");
+      supabase.auth.onAuthStateChange((event) => {
+        if (!useCloud()) return;
+        if (event === "SIGNED_OUT") {
+          cloudContractions = [];
+          updateSignOutVisibility(false);
+          if (appReady) {
+            renderHistory();
+            renderStats();
+          }
+          setSyncMessage("Sign in to sync your list.");
+          if (loginDialog && typeof loginDialog.showModal === "function" && !loginDialog.open) {
+            showLoginModal();
+          }
+        }
+      });
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        await pullCloudContractions();
+        await migrateLocalToCloudIfNeeded();
+        setSyncMessage("");
+        updateSignOutVisibility(true);
+      } else {
+        setSyncMessage("Sign in to sync your list.");
+        updateSignOutVisibility(false);
+        showLoginModal();
+      }
     }
   } catch (e) {
     console.error(e);
     setSyncMessage(
-      "Cloud sync failed — check supabase-config.js, schema, and Anonymous auth. Using empty list until fixed.",
+      "Cloud sync failed — check supabase-config.js, schema, and that Email provider allows password sign-in.",
       true
     );
     cloudContractions = [];

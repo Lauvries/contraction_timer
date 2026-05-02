@@ -56,6 +56,45 @@
       </div>
     </div>
 
+    <dialog class="options-dialog login-dialog" id="loginDialog" aria-labelledby="loginTitle" aria-modal="true">
+      <form class="options-form" id="loginForm">
+        <h2 id="loginTitle" class="options-title">Sign in</h2>
+        <p class="options-intro">
+          Same email and password as in Supabase (Authentication → Users). Enables sync on this and other devices.
+        </p>
+        <div class="options-field">
+          <label class="options-label" for="loginEmail">Email</label>
+          <div class="options-number-wrap login-field-wrap">
+            <input
+              id="loginEmail"
+              name="email"
+              class="options-input"
+              type="email"
+              autocomplete="username"
+              required
+            />
+          </div>
+        </div>
+        <div class="options-field">
+          <label class="options-label" for="loginPassword">Password</label>
+          <div class="options-number-wrap login-field-wrap">
+            <input
+              id="loginPassword"
+              name="password"
+              class="options-input"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+        </div>
+        <p id="loginError" class="options-hint login-error" hidden></p>
+        <div class="options-actions login-actions">
+          <button type="submit" class="btn-primary login-submit" id="loginSubmit">Sign in</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog class="options-dialog" id="optionsDialog" aria-labelledby="optionsTitle">
       <form method="dialog" class="options-form" id="optionsForm">
         <h2 id="optionsTitle" class="options-title">Options</h2>
@@ -109,6 +148,7 @@
           <p class="options-hint">Leave both empty to turn off. Max 59:59 per field.</p>
         </div>
         <div class="options-actions">
+          <button type="button" class="btn-secondary" id="signOutBtn" hidden>Sign out</button>
           <button type="button" class="btn-secondary" id="clearTarget">Clear target</button>
           <button type="submit" class="btn-primary">Done</button>
         </div>
