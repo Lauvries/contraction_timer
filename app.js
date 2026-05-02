@@ -41,6 +41,8 @@ let editingDurationId = null;
 let supabase = null;
 /** @type {Array<{ id: string, endMs: number, intensity: number, durationSec: number | null }>} */
 let cloudContractions = [];
+/** @type {import("@supabase/supabase-js").RealtimeChannel | null} */
+let contractionsRealtimeChannel = null;
 let appReady = false;
 
 function useCloud() {
@@ -268,6 +270,10 @@ async function loadCloudDataAfterAuth() {
   if (!supabase) return;
   await pullCloudContractions();
   await migrateLocalToCloudIfNeeded();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user?.id) subscribeContractionsRealtime(user.id);
   setSyncMessage("");
   updateSignOutVisibility(true);
   if (loginDialog && loginDialog.open) loginDialog.close();
@@ -315,6 +321,85 @@ async function pullCloudContractions() {
         r.duration_sec === null || r.duration_sec === undefined ? null : Number(r.duration_sec),
     })
   );
+}
+
+function teardownContractionsRealtime() {
+  if (!supabase || !contractionsRealtimeChannel) {
+    contractionsRealtimeChannel = null;
+    return;
+  }
+  void supabase.removeChannel(contractionsRealtimeChannel);
+  contractionsRealtimeChannel = null;
+}
+
+/** @param {Record<string, unknown>} row */
+function rowPayloadToEntry(row) {
+  if (!row || typeof row.id !== "string") return null;
+  return normalizeEntry({
+    id: row.id,
+    endMs: Number(row.end_ms),
+    intensity: Number(row.intensity),
+    durationSec:
+      row.duration_sec === null || row.duration_sec === undefined ? null : Number(row.duration_sec),
+  });
+}
+
+/** @param {import("@supabase/supabase-js").RealtimePostgresChangesPayload<Record<string, unknown>>} payload */
+function applyContractionsRealtimePayload(payload) {
+  const ev = payload.eventType;
+  if (ev === "INSERT") {
+    const e = rowPayloadToEntry(/** @type {Record<string, unknown>} */ (payload.new));
+    if (!e) return;
+    const i = cloudContractions.findIndex((x) => x.id === e.id);
+    if (i === -1) cloudContractions.unshift(e);
+    else cloudContractions[i] = e;
+  } else if (ev === "UPDATE") {
+    const e = rowPayloadToEntry(/** @type {Record<string, unknown>} */ (payload.new));
+    if (!e) return;
+    const i = cloudContractions.findIndex((x) => x.id === e.id);
+    if (i !== -1) cloudContractions[i] = e;
+    else cloudContractions.unshift(e);
+  } else if (ev === "DELETE") {
+    const oldRow = /** @type {Record<string, unknown> | undefined} */ (payload.old);
+    const id = oldRow && typeof oldRow.id === "string" ? oldRow.id : null;
+    if (id) cloudContractions = cloudContractions.filter((x) => x.id !== id);
+  }
+  cloudContractions.sort((a, b) => b.endMs - a.endMs);
+  cloudContractions = cloudContractions.slice(0, 100);
+  if (appReady) {
+    renderHistory();
+    renderStats();
+  }
+}
+
+/** @param {string} userId */
+function subscribeContractionsRealtime(userId) {
+  if (!supabase || !userId) return;
+  teardownContractionsRealtime();
+  contractionsRealtimeChannel = supabase
+    .channel(`contractions:${userId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "contractions",
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        try {
+          applyContractionsRealtimePayload(payload);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.warn("Realtime:", status, err);
+        setSyncMessage("Live sync lost connection — refresh if the list looks wrong.", true);
+      }
+    });
 }
 
 async function cloudInsert(entry) {
@@ -960,6 +1045,7 @@ signOutBtn?.addEventListener("click", () => void signOutCloud());
 
 async function signOutCloud() {
   if (!supabase) return;
+  teardownContractionsRealtime();
   await supabase.auth.signOut();
   cloudContractions = [];
   updateSignOutVisibility(false);
@@ -986,6 +1072,7 @@ async function bootstrap() {
       supabase.auth.onAuthStateChange((event) => {
         if (!useCloud()) return;
         if (event === "SIGNED_OUT") {
+          teardownContractionsRealtime();
           cloudContractions = [];
           updateSignOutVisibility(false);
           if (appReady) {
@@ -1006,6 +1093,7 @@ async function bootstrap() {
         await migrateLocalToCloudIfNeeded();
         setSyncMessage("");
         updateSignOutVisibility(true);
+        if (session.user?.id) subscribeContractionsRealtime(session.user.id);
       } else {
         setSyncMessage("Sign in to sync your list.");
         updateSignOutVisibility(false);

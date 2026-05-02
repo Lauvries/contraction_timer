@@ -35,3 +35,16 @@ create policy "contractions_update_own"
 create policy "contractions_delete_own"
   on public.contractions for delete
   using (auth.uid() = user_id);
+
+-- Live updates across tabs/browsers (Supabase Realtime)
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'contractions'
+  ) then
+    alter publication supabase_realtime add table public.contractions;
+  end if;
+end $$;
