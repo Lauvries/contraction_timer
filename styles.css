@@ -1185,6 +1185,18 @@ body.app-loading .main-btn {
   opacity: 0.9;
 }
 
+.feed-total-pill {
+  font-size: 0.78rem;
+  font-weight: 750;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 22%, transparent);
+  padding: 0.22rem 0.45rem;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
 .feed-item-meta {
   font-size: 0.8rem;
   color: var(--text-muted);

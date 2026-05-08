@@ -135,6 +135,27 @@ export async function addSecondSide(supabase, id, patch) {
 /**
  * @param {import("@supabase/supabase-js").SupabaseClient} supabase
  * @param {string} id
+ * @param {{ startedAtMs?: number, duration1Sec?: number, duration2Sec?: number | null }} patch
+ */
+export async function updateFeed(supabase, id, patch) {
+  const row = /** @type {Record<string, unknown>} */ ({});
+  if (typeof patch.startedAtMs === "number" && Number.isFinite(patch.startedAtMs)) {
+    row.started_at_ms = Math.floor(patch.startedAtMs);
+  }
+  if (typeof patch.duration1Sec === "number" && Number.isFinite(patch.duration1Sec)) {
+    row.duration1_sec = Math.max(0, Math.floor(patch.duration1Sec));
+  }
+  if ("duration2Sec" in patch) {
+    row.duration2_sec =
+      patch.duration2Sec == null || patch.duration2Sec === undefined ? null : Math.max(0, Math.floor(patch.duration2Sec));
+  }
+  const { error } = await supabase.from("feeds").update(row).eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * @param {import("@supabase/supabase-js").SupabaseClient} supabase
+ * @param {string} id
  */
 export async function deleteFeed(supabase, id) {
   const { error } = await supabase.from("feeds").delete().eq("id", id);
