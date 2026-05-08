@@ -830,12 +830,17 @@ body.app-loading .main-btn {
 
 .baby-header {
   margin-bottom: 1.1rem;
+  position: relative;
+  padding-top: 0.2rem;
 }
 
 .baby-header-actions {
   display: flex;
-  justify-content: center;
-  margin-top: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0;
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .baby-layout {
