@@ -13,18 +13,11 @@ const loginSubmitBtn = document.getElementById("loginSubmit");
 
 const feedLeftBtn = document.getElementById("feedLeft");
 const feedRightBtn = document.getElementById("feedRight");
-const feedPauseBtn = document.getElementById("feedPause");
-const feedStopBtn = document.getElementById("feedStop");
-const feedAddLeftBtn = document.getElementById("feedAddLeft");
-const feedAddRightBtn = document.getElementById("feedAddRight");
+const feedLeftLabel = document.getElementById("feedLeftLabel");
+const feedRightLabel = document.getElementById("feedRightLabel");
+const feedStopMidBtn = document.getElementById("feedStopMid");
 const feedDoneBtn = document.getElementById("feedDone");
 
-const feedingStateIdle = document.getElementById("feedingStateIdle");
-const feedingStateRunning = document.getElementById("feedingStateRunning");
-const feedingStateAfter = document.getElementById("feedingStateAfter");
-const feedingRunningWrap = document.getElementById("feedingRunningWrap");
-const feedingRunningLabel = document.getElementById("feedingRunningLabel");
-const feedingElapsed = document.getElementById("feedingElapsed");
 const feedingSummary = document.getElementById("feedingSummary");
 const feedTimeSinceEl = document.getElementById("feedTimeSince");
 const feedTimeToEl = document.getElementById("feedTimeTo");
@@ -40,8 +33,10 @@ let feeds = [];
 /** @type {null | (() => void)} */
 let feedsUnsub = null;
 
-/** @type {null | { phase: "side1" | "side2", startedPerf: number, startedWallMs: number, side: "L" | "R", pausedAtPerf: number | null, pausedTotalMs: number, feedId?: string, side1DurationSec?: number, side1?: "L" | "R" }} */
+/** @type {null | { side: "L" | "R", startedPerf: number, startedWallMs: number, pausedAtPerf: number | null, pausedTotalMs: number }} */
 let active = null;
+/** @type {{ feedId: string | null, side1: "L" | "R" | null, duration1Sec: number | null }} */
+let pendingFeed = { feedId: null, side1: null, duration1Sec: null };
 /** @type {number | null} */
 let tick = null;
 /** @type {number | null} */
@@ -106,6 +101,126 @@ function formatTimeOnly(ms) {
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
+}
+
+function computeActiveRunningMs() {
+  if (!active) return 0;
+  const now = performance.now();
+  const end = active.pausedAtPerf == null ? now : active.pausedAtPerf;
+  return Math.max(0, end - active.startedPerf - active.pausedTotalMs);
+}
+
+function computeActiveDurationSec() {
+  return Math.max(0, Math.round(computeActiveRunningMs() / 1000));
+}
+
+function renderFeedButtons() {
+  const activeSide = active?.side ?? null;
+  const running = activeSide !== null && active?.pausedAtPerf == null;
+  const paused = activeSide !== null && active?.pausedAtPerf != null;
+
+  const elapsedText = formatElapsed(computeActiveRunningMs());
+  if (feedLeftLabel) feedLeftLabel.textContent = activeSide === "L" ? elapsedText : "Left";
+  if (feedRightLabel) feedRightLabel.textContent = activeSide === "R" ? elapsedText : "Right";
+
+  feedLeftBtn.classList.toggle("is-active", activeSide === "L");
+  feedRightBtn.classList.toggle("is-active", activeSide === "R");
+  feedLeftBtn.classList.toggle("is-paused", paused && activeSide === "L");
+  feedRightBtn.classList.toggle("is-paused", paused && activeSide === "R");
+
+  if (feedStopMidBtn) feedStopMidBtn.disabled = !activeSide;
+
+  if (feedTimeToHint) {
+    if (running) feedTimeToHint.textContent = "Running";
+    else if (paused) feedTimeToHint.textContent = "Paused";
+    else feedTimeToHint.textContent = "";
+  }
+}
+
+function updateTick() {
+  if (!active) return;
+  renderFeedButtons();
+}
+
+function startSide(side) {
+  active = {
+    side,
+    startedPerf: performance.now(),
+    startedWallMs: Date.now(),
+    pausedAtPerf: null,
+    pausedTotalMs: 0,
+  };
+  if (tick != null) clearInterval(tick);
+  tick = window.setInterval(updateTick, 250);
+  renderFeedButtons();
+}
+
+function togglePause() {
+  if (!active) return;
+  if (active.pausedAtPerf == null) {
+    active.pausedAtPerf = performance.now();
+  } else {
+    active.pausedTotalMs += Math.max(0, performance.now() - active.pausedAtPerf);
+    active.pausedAtPerf = null;
+  }
+  renderFeedButtons();
+}
+
+async function stopActiveAndSave() {
+  if (!active || !supabase) return;
+  if (tick != null) {
+    clearInterval(tick);
+    tick = null;
+  }
+
+  const durationSec = computeActiveDurationSec();
+  const side = active.side;
+  const startedAtMs = active.startedWallMs;
+  active = null;
+  renderFeedButtons();
+
+  setSyncMessage("Saving…");
+  try {
+    if (!pendingFeed.feedId) {
+      const row = await insertFeed(supabase, { startedAtMs, side1: side, duration1Sec: durationSec });
+      pendingFeed = { feedId: row.id, side1: row.side1, duration1Sec: row.duration1Sec };
+      feedingSummary.textContent = `${row.side1} ${formatDurationSec(row.duration1Sec)}`;
+    } else {
+      await addSecondSide(supabase, pendingFeed.feedId, { side2: side, duration2Sec: durationSec });
+      feedingSummary.textContent = `${pendingFeed.side1} ${formatDurationSec(pendingFeed.duration1Sec || 0)} + ${side} ${formatDurationSec(durationSec)}`;
+      pendingFeed = { feedId: null, side1: null, duration1Sec: null };
+    }
+    setSyncMessage("");
+  } catch (e) {
+    console.error(e);
+    setSyncMessage("Could not save feed.", true);
+  }
+}
+
+async function onPressSide(side) {
+  if (!supabase) return;
+  if (!active) {
+    startSide(side);
+    return;
+  }
+  if (active.side === side) {
+    togglePause();
+    return;
+  }
+  // switching sides: stop current boob, then immediately start next
+  await stopActiveAndSave();
+  startSide(side);
+}
+
+function resetFlow() {
+  if (tick != null) {
+    clearInterval(tick);
+    tick = null;
+  }
+  active = null;
+  pendingFeed = { feedId: null, side1: null, duration1Sec: null };
+  if (feedingSummary) feedingSummary.textContent = "";
+  renderFeedButtons();
 }
 
 function totalDurationSec(feed) {
@@ -195,137 +310,7 @@ function renderFeeds() {
   renderFeedingMetrics();
 }
 
-function showState(name) {
-  feedingStateIdle.hidden = name !== "idle";
-  feedingStateRunning.hidden = name !== "running";
-  feedingStateAfter.hidden = name !== "after";
-  if (feedingRunningWrap) feedingRunningWrap.hidden = name !== "running";
-}
-
-function setControlsEnabled(on) {
-  feedLeftBtn.disabled = !on;
-  feedRightBtn.disabled = !on;
-  if (feedPauseBtn) feedPauseBtn.disabled = !on;
-  feedStopBtn.disabled = !on;
-  feedAddLeftBtn.disabled = !on;
-  feedAddRightBtn.disabled = !on;
-  feedDoneBtn.disabled = !on;
-}
-
-function updateTick() {
-  if (!active) return;
-  const now = performance.now();
-  const runningMs =
-    (active.pausedAtPerf == null ? now : active.pausedAtPerf) - active.startedPerf - active.pausedTotalMs;
-  const ms = Math.max(0, runningMs);
-  feedingElapsed.textContent = formatElapsed(ms);
-}
-
-function startPhase(phase, side) {
-  active = {
-    phase,
-    side,
-    startedPerf: performance.now(),
-    startedWallMs: Date.now(),
-    pausedAtPerf: null,
-    pausedTotalMs: 0,
-    ...(active && active.feedId ? { feedId: active.feedId, side1: active.side1, side1DurationSec: active.side1DurationSec } : {}),
-  };
-  feedingRunningLabel.textContent =
-    phase === "side1" ? `Feeding ${side}…` : `Other side ${side}…`;
-  feedingElapsed.textContent = "0:00";
-  if (feedPauseBtn) feedPauseBtn.textContent = "Pause";
-  showState("running");
-  if (tick != null) clearInterval(tick);
-  tick = window.setInterval(updateTick, 250);
-}
-
-function togglePause() {
-  if (!active) return;
-  if (active.pausedAtPerf == null) {
-    active.pausedAtPerf = performance.now();
-    if (feedPauseBtn) feedPauseBtn.textContent = "Resume";
-  } else {
-    active.pausedTotalMs += Math.max(0, performance.now() - active.pausedAtPerf);
-    active.pausedAtPerf = null;
-    if (feedPauseBtn) feedPauseBtn.textContent = "Pause";
-  }
-  updateTick();
-}
-
-async function stopPhase() {
-  if (!active || !supabase) return;
-  if (tick != null) {
-    clearInterval(tick);
-    tick = null;
-  }
-  const now = performance.now();
-  const runningMs =
-    (active.pausedAtPerf == null ? now : active.pausedAtPerf) - active.startedPerf - active.pausedTotalMs;
-  const durationSec = Math.max(0, Math.round(Math.max(0, runningMs) / 1000));
-
-  if (active.phase === "side1") {
-    setSyncMessage("Saving…");
-    setControlsEnabled(false);
-    try {
-      const row = await insertFeed(supabase, {
-        startedAtMs: active.startedWallMs,
-        side1: active.side,
-        duration1Sec: durationSec,
-      });
-      active = {
-        phase: "side2",
-        side: active.side,
-        startedPerf: active.startedPerf,
-        startedWallMs: active.startedWallMs,
-        feedId: row.id,
-        side1: row.side1,
-        side1DurationSec: row.duration1Sec,
-      };
-      feedingSummary.textContent = `${row.side1} ${formatDurationSec(row.duration1Sec)}`;
-      showState("after");
-      setSyncMessage("");
-    } catch (e) {
-      console.error(e);
-      setSyncMessage("Could not save feed.", true);
-      showState("idle");
-      active = null;
-    } finally {
-      setControlsEnabled(true);
-    }
-    return;
-  }
-
-  // side2 phase: patch existing row
-  if (!active.feedId || !active.side1 || typeof active.side1DurationSec !== "number") {
-    showState("idle");
-    active = null;
-    return;
-  }
-  setSyncMessage("Saving…");
-  setControlsEnabled(false);
-  try {
-    await addSecondSide(supabase, active.feedId, { side2: active.side, duration2Sec: durationSec });
-    feedingSummary.textContent = `${active.side1} ${formatDurationSec(active.side1DurationSec)} + ${active.side} ${formatDurationSec(durationSec)}`;
-    showState("after");
-    setSyncMessage("");
-  } catch (e) {
-    console.error(e);
-    setSyncMessage("Could not save second side.", true);
-  } finally {
-    setControlsEnabled(true);
-  }
-}
-
-function resetFlow() {
-  if (tick != null) {
-    clearInterval(tick);
-    tick = null;
-  }
-  active = null;
-  feedingSummary.textContent = "";
-  showState("idle");
-}
+// (state machine moved above)
 
 async function signOut() {
   if (!supabase) return;
@@ -393,12 +378,9 @@ async function onSignedIn() {
 }
 
 // Event wiring
-feedLeftBtn.addEventListener("click", () => startPhase("side1", "L"));
-feedRightBtn.addEventListener("click", () => startPhase("side1", "R"));
-feedPauseBtn?.addEventListener("click", () => togglePause());
-feedStopBtn.addEventListener("click", () => void stopPhase());
-feedAddLeftBtn.addEventListener("click", () => startPhase("side2", "L"));
-feedAddRightBtn.addEventListener("click", () => startPhase("side2", "R"));
+feedLeftBtn.addEventListener("click", () => void onPressSide("L"));
+feedRightBtn.addEventListener("click", () => void onPressSide("R"));
+feedStopMidBtn?.addEventListener("click", () => void stopActiveAndSave());
 feedDoneBtn.addEventListener("click", () => resetFlow());
 
 loginForm?.addEventListener("submit", (e) => {
