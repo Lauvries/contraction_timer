@@ -688,8 +688,22 @@ async function onSignedIn() {
 }
 
 // Event wiring
-feedLeftBtn.addEventListener("click", () => void onPressSide("L"));
-feedRightBtn.addEventListener("click", () => void onPressSide("R"));
+feedLeftBtn.addEventListener("click", () => {
+  try {
+    void onPressSide("L");
+  } catch (e) {
+    console.error(e);
+    setSyncMessage("Error on Left tap — check console.", true);
+  }
+});
+feedRightBtn.addEventListener("click", () => {
+  try {
+    void onPressSide("R");
+  } catch (e) {
+    console.error(e);
+    setSyncMessage("Error on Right tap — check console.", true);
+  }
+});
 feedStopMidBtn?.addEventListener("click", () => void stopActiveAndFinalizeFeed());
 
 loginForm?.addEventListener("submit", (e) => {
@@ -698,6 +712,9 @@ loginForm?.addEventListener("submit", (e) => {
 });
 loginDialog?.addEventListener("cancel", (e) => e.preventDefault());
 signOutBtn?.addEventListener("click", () => void signOut());
+
+// Smoke indicator that baby.js booted and handlers attached.
+setSyncMessage("");
 
 async function bootstrap() {
   resetFlow();
