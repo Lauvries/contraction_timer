@@ -198,12 +198,6 @@ function renderFeedButtons() {
 
   if (feedStopMidBtn) feedStopMidBtn.disabled = lMs <= 0 && rMs <= 0 && !activeSide;
 
-  if (feedTimeToHint) {
-    if (running) feedTimeToHint.textContent = "Running";
-    else if (paused) feedTimeToHint.textContent = "Paused";
-    else feedTimeToHint.textContent = "";
-  }
-
   // Beep on each 5-minute boundary for the currently running side.
   if (running && activeSide) {
     const ms = sideTotalMs(activeSide);
