@@ -998,6 +998,11 @@ body.app-loading .main-btn {
   padding: 0.8rem 0.9rem;
 }
 
+.feeding-actions--after .btn-primary {
+  background: var(--accent);
+  color: var(--bg);
+}
+
 .feeding-done {
   width: 100%;
   border-radius: 14px;
