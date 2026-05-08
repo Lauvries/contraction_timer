@@ -42,12 +42,53 @@ let accumMs = { L: 0, R: 0 };
 let sessionStartedAtMs = null;
 /** @type {"L" | "R" | null} */
 let sessionFirstSide = null;
+/** @type {{ L: number, R: number }} */
+let lastBeepBucketBySide = { L: 0, R: 0 };
 /** @type {number | null} */
 let tick = null;
 /** @type {number | null} */
 let metricsTick = null;
 
 const FEED_TARGET_INTERVAL_MS = 3 * 60 * 60 * 1000;
+const FEED_BEEP_EVERY_MS = 5 * 60 * 1000;
+
+/** @type {AudioContext | null} */
+let audioCtx = null;
+
+function getAudioContext() {
+  if (audioCtx) return audioCtx;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  audioCtx = new Ctx();
+  return audioCtx;
+}
+
+function tryUnlockAudio() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume();
+}
+
+function beep() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (ctx.state === "suspended") return;
+
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(880, now);
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.14);
+}
 
 function useCloud() {
   const u = String(window.SUPABASE_URL || "").trim();
@@ -162,6 +203,16 @@ function renderFeedButtons() {
     else if (paused) feedTimeToHint.textContent = "Paused";
     else feedTimeToHint.textContent = "";
   }
+
+  // Beep on each 5-minute boundary for the currently running side.
+  if (running && activeSide) {
+    const ms = sideTotalMs(activeSide);
+    const bucket = Math.floor(ms / FEED_BEEP_EVERY_MS);
+    if (bucket > 0 && bucket > lastBeepBucketBySide[activeSide]) {
+      lastBeepBucketBySide[activeSide] = bucket;
+      beep();
+    }
+  }
 }
 
 function updateTick() {
@@ -170,6 +221,7 @@ function updateTick() {
 }
 
 function startSide(side) {
+  tryUnlockAudio();
   if (sessionStartedAtMs == null) sessionStartedAtMs = Date.now();
   if (sessionFirstSide == null) sessionFirstSide = side;
   active = {
@@ -186,6 +238,7 @@ function startSide(side) {
 
 function togglePause() {
   if (!active) return;
+  tryUnlockAudio();
   if (active.pausedAtPerf == null) {
     active.pausedAtPerf = performance.now();
   } else {
@@ -285,6 +338,7 @@ function resetFlow() {
   accumMs = { L: 0, R: 0 };
   sessionStartedAtMs = null;
   sessionFirstSide = null;
+  lastBeepBucketBySide = { L: 0, R: 0 };
   renderFeedButtons();
 }
 
