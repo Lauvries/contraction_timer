@@ -918,6 +918,10 @@ body.app-loading .main-btn {
   gap: 10px;
 }
 
+.feeding-actions--after {
+  margin-bottom: 10px;
+}
+
 .feeding-side {
   padding: 0.9rem 0.9rem;
   border-radius: 14px;
@@ -957,7 +961,6 @@ body.app-loading .main-btn {
   width: 100%;
   border-radius: 14px;
   padding: 0.8rem 0.9rem;
-  margin-bottom: 10px;
 }
 
 .feeding-done {

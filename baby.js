@@ -14,7 +14,8 @@ const loginSubmitBtn = document.getElementById("loginSubmit");
 const feedLeftBtn = document.getElementById("feedLeft");
 const feedRightBtn = document.getElementById("feedRight");
 const feedStopBtn = document.getElementById("feedStop");
-const feedAddOtherBtn = document.getElementById("feedAddOther");
+const feedAddLeftBtn = document.getElementById("feedAddLeft");
+const feedAddRightBtn = document.getElementById("feedAddRight");
 const feedDoneBtn = document.getElementById("feedDone");
 
 const feedingStateIdle = document.getElementById("feedingStateIdle");
@@ -136,7 +137,8 @@ function setControlsEnabled(on) {
   feedLeftBtn.disabled = !on;
   feedRightBtn.disabled = !on;
   feedStopBtn.disabled = !on;
-  feedAddOtherBtn.disabled = !on;
+  feedAddLeftBtn.disabled = !on;
+  feedAddRightBtn.disabled = !on;
   feedDoneBtn.disabled = !on;
 }
 
@@ -189,7 +191,6 @@ async function stopPhase() {
         side1DurationSec: row.duration1Sec,
       };
       feedingSummary.textContent = `${row.side1} ${formatDurationSec(row.duration1Sec)}`;
-      feedAddOtherBtn.hidden = false;
       showState("after");
       setSyncMessage("");
     } catch (e) {
@@ -214,7 +215,6 @@ async function stopPhase() {
   try {
     await addSecondSide(supabase, active.feedId, { side2: active.side, duration2Sec: durationSec });
     feedingSummary.textContent = `${active.side1} ${formatDurationSec(active.side1DurationSec)} + ${active.side} ${formatDurationSec(durationSec)}`;
-    feedAddOtherBtn.hidden = true;
     showState("after");
     setSyncMessage("");
   } catch (e) {
@@ -232,7 +232,6 @@ function resetFlow() {
   }
   active = null;
   feedingSummary.textContent = "";
-  feedAddOtherBtn.hidden = false;
   showState("idle");
 }
 
@@ -299,12 +298,8 @@ async function onSignedIn() {
 feedLeftBtn.addEventListener("click", () => startPhase("side1", "L"));
 feedRightBtn.addEventListener("click", () => startPhase("side1", "R"));
 feedStopBtn.addEventListener("click", () => void stopPhase());
-feedAddOtherBtn.addEventListener("click", () => {
-  // If we recorded side1, default other side to opposite
-  const prev = active?.side1 || active?.side;
-  const next = prev === "L" ? "R" : "L";
-  startPhase("side2", next);
-});
+feedAddLeftBtn.addEventListener("click", () => startPhase("side2", "L"));
+feedAddRightBtn.addEventListener("click", () => startPhase("side2", "R"));
 feedDoneBtn.addEventListener("click", () => resetFlow());
 
 loginForm?.addEventListener("submit", (e) => {
