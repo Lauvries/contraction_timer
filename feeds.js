@@ -132,6 +132,15 @@ export async function addSecondSide(supabase, id, patch) {
 }
 
 /**
+ * @param {import("@supabase/supabase-js").SupabaseClient} supabase
+ * @param {string} id
+ */
+export async function deleteFeed(supabase, id) {
+  const { error } = await supabase.from("feeds").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/**
  * Subscribe to live changes.
  *
  * @param {import("@supabase/supabase-js").SupabaseClient} supabase

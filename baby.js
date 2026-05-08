@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { addSecondSide, insertFeed, pullFeeds, subscribeFeedsRealtime } from "./feeds.js";
+import { addSecondSide, deleteFeed, insertFeed, pullFeeds, subscribeFeedsRealtime } from "./feeds.js";
 
 const syncStatusEl = document.getElementById("syncStatus");
 const signOutBtn = document.getElementById("signOutBtn");
@@ -161,7 +161,29 @@ function renderFeeds() {
     meta.className = "feed-item-meta";
     meta.textContent = f.side2 ? "Two sides" : "One side";
 
-    li.append(title, meta);
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "feed-delete-btn";
+    del.textContent = "×";
+    del.setAttribute("aria-label", "Delete feed");
+    del.addEventListener("click", async () => {
+      if (!supabase) return;
+      if (!confirm("Delete this feed?")) return;
+      setSyncMessage("Deleting…");
+      try {
+        await deleteFeed(supabase, f.id);
+        setSyncMessage("");
+      } catch (e) {
+        console.error(e);
+        setSyncMessage("Could not delete feed.", true);
+      }
+    });
+
+    const top = document.createElement("div");
+    top.className = "feed-item-top";
+    top.append(title, del);
+
+    li.append(top, meta);
     feedsListEl.appendChild(li);
   }
   renderFeedingMetrics();

@@ -1022,12 +1022,40 @@ body.app-loading .main-btn {
   gap: 2px;
 }
 
+.feed-item-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .feed-item-title {
   display: flex;
   justify-content: space-between;
   gap: 10px;
   font-weight: 850;
   font-size: 0.95rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.feed-delete-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  font-size: 1.2rem;
+  line-height: 1;
+  font-weight: 900;
+  cursor: pointer;
+  flex-shrink: 0;
+  touch-action: manipulation;
+}
+
+.feed-delete-btn:active {
+  opacity: 0.9;
 }
 
 .feed-item-meta {
