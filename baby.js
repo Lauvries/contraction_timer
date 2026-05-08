@@ -18,7 +18,6 @@ const feedRightLabel = document.getElementById("feedRightLabel");
 const feedLeftIcon = document.getElementById("feedLeftIcon");
 const feedRightIcon = document.getElementById("feedRightIcon");
 const feedStopMidBtn = document.getElementById("feedStopMid");
-const feedDoneBtn = document.getElementById("feedDone");
 
 const feedingSummary = document.getElementById("feedingSummary");
 const feedTimeSinceEl = document.getElementById("feedTimeSince");
@@ -156,8 +155,7 @@ function renderFeedButtons() {
   feedLeftBtn.classList.toggle("is-paused", paused && activeSide === "L");
   feedRightBtn.classList.toggle("is-paused", paused && activeSide === "R");
 
-  if (feedStopMidBtn) feedStopMidBtn.disabled = !activeSide;
-  feedDoneBtn.disabled = lMs <= 0 && rMs <= 0 && !activeSide;
+  if (feedStopMidBtn) feedStopMidBtn.disabled = lMs <= 0 && rMs <= 0 && !activeSide;
 
   if (feedTimeToHint) {
     if (running) feedTimeToHint.textContent = "Running";
@@ -338,8 +336,8 @@ function renderFeeds() {
     right.textContent = formatTimeOnly(f.startedAtMs);
 
     left.textContent = f.side2
-      ? `${f.side1} ${formatDurationSec(f.duration1Sec)} + ${f.side2} ${formatDurationSec(f.duration2Sec || 0)}`
-      : `${f.side1} ${formatDurationSec(f.duration1Sec)}`;
+      ? `${f.side1}: ${formatDurationSec(f.duration1Sec)}, ${f.side2}: ${formatDurationSec(f.duration2Sec || 0)}`
+      : `${f.side1}: ${formatDurationSec(f.duration1Sec)}`;
     title.append(left, right);
 
     const meta = document.createElement("div");
@@ -447,8 +445,7 @@ async function onSignedIn() {
 // Event wiring
 feedLeftBtn.addEventListener("click", () => void onPressSide("L"));
 feedRightBtn.addEventListener("click", () => void onPressSide("R"));
-feedStopMidBtn?.addEventListener("click", () => pauseRunningSide());
-feedDoneBtn.addEventListener("click", () => void stopActiveAndFinalizeFeed());
+feedStopMidBtn?.addEventListener("click", () => void stopActiveAndFinalizeFeed());
 
 loginForm?.addEventListener("submit", (e) => {
   e.preventDefault();
