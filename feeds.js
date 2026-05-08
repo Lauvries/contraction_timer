@@ -83,7 +83,7 @@ export async function pullFeeds(supabase) {
 
 /**
  * @param {import("@supabase/supabase-js").SupabaseClient} supabase
- * @param {{ startedAtMs: number, side1: BreastSide, duration1Sec: number }} input
+ * @param {{ startedAtMs: number, side1: BreastSide, duration1Sec: number, side2?: BreastSide | null, duration2Sec?: number | null }} input
  * @returns {Promise<FeedRow>}
  */
 export async function insertFeed(supabase, input) {
@@ -100,8 +100,9 @@ export async function insertFeed(supabase, input) {
     started_at_ms: Math.floor(input.startedAtMs),
     side1: input.side1,
     duration1_sec: Math.max(0, Math.floor(input.duration1Sec)),
-    side2: null,
-    duration2_sec: null,
+    side2: input.side2 ?? null,
+    duration2_sec:
+      input.duration2Sec == null || input.duration2Sec === undefined ? null : Math.max(0, Math.floor(input.duration2Sec)),
   };
 
   const { error } = await supabase.from("feeds").insert(row);
@@ -112,8 +113,8 @@ export async function insertFeed(supabase, input) {
     startedAtMs: row.started_at_ms,
     side1: row.side1,
     duration1Sec: row.duration1_sec,
-    side2: null,
-    duration2Sec: null,
+    side2: row.side2,
+    duration2Sec: row.duration2_sec,
   };
 }
 

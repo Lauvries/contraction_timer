@@ -37,10 +37,12 @@ let feedsUnsub = null;
 
 /** @type {null | { side: "L" | "R", startedPerf: number, startedWallMs: number, pausedAtPerf: number | null, pausedTotalMs: number }} */
 let active = null;
-/** @type {{ feedId: string | null, side1: "L" | "R" | null, duration1Sec: number | null }} */
-let pendingFeed = { feedId: null, side1: null, duration1Sec: null };
 /** @type {{ L: number, R: number }} */
 let accumMs = { L: 0, R: 0 };
+/** @type {number | null} */
+let sessionStartedAtMs = null;
+/** @type {"L" | "R" | null} */
+let sessionFirstSide = null;
 /** @type {number | null} */
 let tick = null;
 /** @type {number | null} */
@@ -162,6 +164,8 @@ function updateTick() {
 }
 
 function startSide(side) {
+  if (sessionStartedAtMs == null) sessionStartedAtMs = Date.now();
+  if (sessionFirstSide == null) sessionFirstSide = side;
   active = {
     side,
     startedPerf: performance.now(),
@@ -202,34 +206,48 @@ function currentSideTotalDurationSec(side) {
   return Math.max(0, Math.round((baseMs + extraMs) / 1000));
 }
 
-async function stopActiveAndSave() {
-  if (!active || !supabase) return;
+async function stopActiveAndFinalizeFeed() {
+  if (!supabase) return;
+  if (!active && accumMs.L === 0 && accumMs.R === 0) return;
   if (tick != null) {
     clearInterval(tick);
     tick = null;
   }
 
-  // Stop this side permanently and save its total (including any previously paused segments)
-  accumMs[active.side] += computeActiveRunningMs();
-  const durationSec = currentSideTotalDurationSec(active.side);
-  const side = active.side;
-  const startedAtMs = active.startedWallMs;
-  active = null;
+  // Stop the currently active side (if any) and finalize totals
+  if (active) {
+    accumMs[active.side] += computeActiveRunningMs();
+    active = null;
+  }
   renderFeedButtons();
-  accumMs[side] = 0;
+
+  const lSec = Math.round(accumMs.L / 1000);
+  const rSec = Math.round(accumMs.R / 1000);
+  const startedAtMs = sessionStartedAtMs ?? Date.now();
+  const first = sessionFirstSide ?? (lSec > 0 ? "L" : "R");
+
+  /** @type {"L"|"R"} */ const side1 = first;
+  /** @type {"L"|"R"} */ const side2 = first === "L" ? "R" : "L";
+  const duration1Sec = side1 === "L" ? lSec : rSec;
+  const duration2Sec = side2 === "L" ? lSec : rSec;
 
   setSyncMessage("Saving…");
   try {
-    if (!pendingFeed.feedId) {
-      const row = await insertFeed(supabase, { startedAtMs, side1: side, duration1Sec: durationSec });
-      pendingFeed = { feedId: row.id, side1: row.side1, duration1Sec: row.duration1Sec };
-      feedingSummary.textContent = `${row.side1} ${formatDurationSec(row.duration1Sec)}`;
+    if (duration1Sec <= 0 && duration2Sec <= 0) {
+      setSyncMessage("");
+      resetFlow();
+      return;
+    }
+
+    if (duration2Sec > 0) {
+      await insertFeed(supabase, { startedAtMs, side1, duration1Sec, side2, duration2Sec });
+      feedingSummary.textContent = `${side1} ${formatDurationSec(duration1Sec)} + ${side2} ${formatDurationSec(duration2Sec)}`;
     } else {
-      await addSecondSide(supabase, pendingFeed.feedId, { side2: side, duration2Sec: durationSec });
-      feedingSummary.textContent = `${pendingFeed.side1} ${formatDurationSec(pendingFeed.duration1Sec || 0)} + ${side} ${formatDurationSec(durationSec)}`;
-      pendingFeed = { feedId: null, side1: null, duration1Sec: null };
+      await insertFeed(supabase, { startedAtMs, side1, duration1Sec });
+      feedingSummary.textContent = `${side1} ${formatDurationSec(duration1Sec)}`;
     }
     setSyncMessage("");
+    resetFlow();
   } catch (e) {
     console.error(e);
     setSyncMessage("Could not save feed.", true);
@@ -257,8 +275,9 @@ function resetFlow() {
     tick = null;
   }
   active = null;
-  pendingFeed = { feedId: null, side1: null, duration1Sec: null };
   accumMs = { L: 0, R: 0 };
+  sessionStartedAtMs = null;
+  sessionFirstSide = null;
   if (feedingSummary) feedingSummary.textContent = "";
   renderFeedButtons();
 }
@@ -420,7 +439,7 @@ async function onSignedIn() {
 // Event wiring
 feedLeftBtn.addEventListener("click", () => void onPressSide("L"));
 feedRightBtn.addEventListener("click", () => void onPressSide("R"));
-feedStopMidBtn?.addEventListener("click", () => void stopActiveAndSave());
+feedStopMidBtn?.addEventListener("click", () => void stopActiveAndFinalizeFeed());
 feedDoneBtn.addEventListener("click", () => resetFlow());
 
 loginForm?.addEventListener("submit", (e) => {
