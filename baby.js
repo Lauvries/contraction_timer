@@ -172,6 +172,9 @@ function renderFeeds() {
       setSyncMessage("Deleting…");
       try {
         await deleteFeed(supabase, f.id);
+        // Optimistic UI update (Realtime DELETE payload may not include old row without REPLICA IDENTITY FULL)
+        feeds = feeds.filter((x) => x.id !== f.id);
+        renderFeeds();
         setSyncMessage("");
       } catch (e) {
         console.error(e);
