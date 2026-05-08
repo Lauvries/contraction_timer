@@ -13,8 +13,8 @@ const loginSubmitBtn = document.getElementById("loginSubmit");
 
 const feedLeftBtn = document.getElementById("feedLeft");
 const feedRightBtn = document.getElementById("feedRight");
-const feedLeftLabel = document.getElementById("feedLeftLabel");
-const feedRightLabel = document.getElementById("feedRightLabel");
+const feedLeftText = document.getElementById("feedLeftText");
+const feedRightText = document.getElementById("feedRightText");
 const feedLeftIcon = document.getElementById("feedLeftIcon");
 const feedRightIcon = document.getElementById("feedRightIcon");
 const feedStopMidBtn = document.getElementById("feedStopMid");
@@ -226,8 +226,8 @@ function renderFeedButtons() {
 
   const lMs = sideTotalMs("L");
   const rMs = sideTotalMs("R");
-  if (feedLeftLabel) feedLeftLabel.textContent = lMs > 0 || activeSide === "L" ? formatElapsed(lMs) : "Left";
-  if (feedRightLabel) feedRightLabel.textContent = rMs > 0 || activeSide === "R" ? formatElapsed(rMs) : "Right";
+  if (feedLeftText) feedLeftText.textContent = lMs > 0 || activeSide === "L" ? formatElapsed(lMs) : "Left";
+  if (feedRightText) feedRightText.textContent = rMs > 0 || activeSide === "R" ? formatElapsed(rMs) : "Right";
   if (feedLeftIcon) feedLeftIcon.textContent = iconFor("L");
   if (feedRightIcon) feedRightIcon.textContent = iconFor("R");
 
