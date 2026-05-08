@@ -448,10 +448,10 @@ function renderFeeds() {
         const startedAtMs = applyTimeStringToStartedAtMs(f.startedAtMs, input.value);
         try {
           await updateFeed(supabase, f.id, { startedAtMs });
-          setSyncMessage(\"\");
+          setSyncMessage("");
         } catch (e) {
           console.error(e);
-          setSyncMessage(\"Could not update time.\", true);
+          setSyncMessage("Could not update time.", true);
         }
       });
       const cancel = document.createElement("button");
@@ -499,7 +499,7 @@ function renderFeeds() {
       sLab.className = "history-mini-suffix";
       sLab.textContent = "s";
 
-      const curSec = editingFeedDurationSide === \"side2\" ? (f.duration2Sec || 0) : f.duration1Sec;
+      const curSec = editingFeedDurationSide === "side2" ? (f.duration2Sec || 0) : f.duration1Sec;
       minIn.value = String(Math.floor(curSec / 60));
       secIn.value = String(curSec % 60);
 
@@ -510,7 +510,7 @@ function renderFeeds() {
       ok.addEventListener("click", async () => {
         const parsed = parseMinSec(minIn.value, secIn.value);
         if (parsed == null) {
-          setSyncMessage(\"Enter minutes/seconds.\", true);
+          setSyncMessage("Enter minutes/seconds.", true);
           return;
         }
         editingFeedDurationId = null;
@@ -518,12 +518,12 @@ function renderFeeds() {
         editingFeedDurationSide = null;
         if (!supabase || !sideKey) return;
         try {
-          if (sideKey === \"side1\") await updateFeed(supabase, f.id, { duration1Sec: parsed });
+          if (sideKey === "side1") await updateFeed(supabase, f.id, { duration1Sec: parsed });
           else await updateFeed(supabase, f.id, { duration2Sec: parsed });
-          setSyncMessage(\"\");
+          setSyncMessage("");
         } catch (e) {
           console.error(e);
-          setSyncMessage(\"Could not update duration.\", true);
+          setSyncMessage("Could not update duration.", true);
         }
       });
       const cancel = document.createElement("button");
@@ -572,14 +572,14 @@ function renderFeeds() {
 
       const dur2 = document.createElement("button");
       dur2.type = "button";
-      dur2.className = `history-meta-btn history-meta-btn--dur${f.side2 ? \"\" : \" is-placeholder\"}`;
-      dur2.textContent = f.side2 ? `${f.side2}: ${formatDurationSec(f.duration2Sec || 0)}` : \"—\";
-      dur2.title = f.side2 ? \"Edit duration\" : \"No second side\";
+      dur2.className = `history-meta-btn history-meta-btn--dur${f.side2 ? "" : " is-placeholder"}`;
+      dur2.textContent = f.side2 ? `${f.side2}: ${formatDurationSec(f.duration2Sec || 0)}` : "—";
+      dur2.title = f.side2 ? "Edit duration" : "No second side";
       dur2.disabled = !f.side2;
       dur2.addEventListener("click", () => {
         if (!f.side2) return;
         editingFeedDurationId = f.id;
-        editingFeedDurationSide = \"side2\";
+        editingFeedDurationSide = "side2";
         editingFeedTimeId = null;
         renderFeeds();
       });
