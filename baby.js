@@ -133,14 +133,21 @@ function iconFor(side) {
   return active.pausedAtPerf == null ? "⏸" : "▶";
 }
 
+function sideTotalMs(side) {
+  const base = accumMs[side];
+  const extra = active?.side === side ? computeActiveRunningMs() : 0;
+  return base + extra;
+}
+
 function renderFeedButtons() {
   const activeSide = active?.side ?? null;
   const running = activeSide !== null && active?.pausedAtPerf == null;
   const paused = activeSide !== null && active?.pausedAtPerf != null;
 
-  const elapsedText = formatElapsed(computeActiveRunningMs());
-  if (feedLeftLabel) feedLeftLabel.textContent = activeSide === "L" ? elapsedText : "Left";
-  if (feedRightLabel) feedRightLabel.textContent = activeSide === "R" ? elapsedText : "Right";
+  const lMs = sideTotalMs("L");
+  const rMs = sideTotalMs("R");
+  if (feedLeftLabel) feedLeftLabel.textContent = lMs > 0 || activeSide === "L" ? formatElapsed(lMs) : "Left";
+  if (feedRightLabel) feedRightLabel.textContent = rMs > 0 || activeSide === "R" ? formatElapsed(rMs) : "Right";
   if (feedLeftIcon) feedLeftIcon.textContent = iconFor("L");
   if (feedRightIcon) feedRightIcon.textContent = iconFor("R");
 
@@ -150,6 +157,7 @@ function renderFeedButtons() {
   feedRightBtn.classList.toggle("is-paused", paused && activeSide === "R");
 
   if (feedStopMidBtn) feedStopMidBtn.disabled = !activeSide;
+  feedDoneBtn.disabled = lMs <= 0 && rMs <= 0 && !activeSide;
 
   if (feedTimeToHint) {
     if (running) feedTimeToHint.textContent = "Running";
@@ -198,6 +206,7 @@ function pauseRunningSide() {
     clearInterval(tick);
     tick = null;
   }
+  renderFeedButtons();
 }
 
 function currentSideTotalDurationSec(side) {
@@ -278,7 +287,6 @@ function resetFlow() {
   accumMs = { L: 0, R: 0 };
   sessionStartedAtMs = null;
   sessionFirstSide = null;
-  if (feedingSummary) feedingSummary.textContent = "";
   renderFeedButtons();
 }
 
@@ -439,8 +447,8 @@ async function onSignedIn() {
 // Event wiring
 feedLeftBtn.addEventListener("click", () => void onPressSide("L"));
 feedRightBtn.addEventListener("click", () => void onPressSide("R"));
-feedStopMidBtn?.addEventListener("click", () => void stopActiveAndFinalizeFeed());
-feedDoneBtn.addEventListener("click", () => resetFlow());
+feedStopMidBtn?.addEventListener("click", () => pauseRunningSide());
+feedDoneBtn.addEventListener("click", () => void stopActiveAndFinalizeFeed());
 
 loginForm?.addEventListener("submit", (e) => {
   e.preventDefault();
