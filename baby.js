@@ -96,6 +96,13 @@ function formatElapsed(ms) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function formatHoursMinutes(ms) {
+  const totalMin = Math.max(0, Math.floor(ms / 60000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${h}:${String(m).padStart(2, "0")}`;
+}
+
 function formatDurationSec(sec) {
   return formatElapsed(sec * 1000);
 }
@@ -281,10 +288,10 @@ function renderFeedingMetrics() {
 
   const remainingMs = FEED_TARGET_INTERVAL_MS - sinceMs;
   if (remainingMs <= 0) {
-    feedTimeToEl.textContent = `${formatElapsed(-remainingMs)} overdue`;
+    feedTimeToEl.textContent = `${formatHoursMinutes(-remainingMs)} overdue`;
     feedTimeToEl.classList.add("feeding-metric-value--overdue");
   } else {
-    feedTimeToEl.textContent = formatElapsed(remainingMs);
+    feedTimeToEl.textContent = formatHoursMinutes(remainingMs);
     feedTimeToEl.classList.remove("feeding-metric-value--overdue");
   }
 }
