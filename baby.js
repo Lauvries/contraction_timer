@@ -207,16 +207,19 @@ function computeActiveDurationSec() {
   return Math.max(0, Math.round(computeActiveRunningMs() / 1000));
 }
 
-function iconFor(side) {
-  if (!active || active.side !== side) return "";
-  // show what will happen if you press again
-  return active.pausedAtPerf == null ? "⏸" : "▶";
-}
-
 function sideTotalMs(side) {
   const base = accumMs[side];
   const extra = active?.side === side ? computeActiveRunningMs() : 0;
   return base + extra;
+}
+
+function iconFor(side) {
+  const totalMs = sideTotalMs(side);
+  if (totalMs <= 0) return "";
+  // If this side is active, show the toggle action (pause or resume).
+  if (active?.side === side) return active.pausedAtPerf == null ? "⏸" : "▶";
+  // If this side has time but isn't active, show that it can be resumed.
+  return "▶";
 }
 
 function renderFeedButtons() {
