@@ -899,10 +899,23 @@ body.app-loading .main-btn {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .feeding-main-btn .main-btn-label {
   font-size: 1.25rem;
+}
+
+.feeding-btn-icon {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0.9;
+  color: color-mix(in srgb, var(--bg) 25%, var(--text));
+  text-shadow: 0 1px 0 rgb(0 0 0 / 20%);
 }
 
 .feeding-main-btn--left {

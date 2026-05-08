@@ -15,6 +15,8 @@ const feedLeftBtn = document.getElementById("feedLeft");
 const feedRightBtn = document.getElementById("feedRight");
 const feedLeftLabel = document.getElementById("feedLeftLabel");
 const feedRightLabel = document.getElementById("feedRightLabel");
+const feedLeftIcon = document.getElementById("feedLeftIcon");
+const feedRightIcon = document.getElementById("feedRightIcon");
 const feedStopMidBtn = document.getElementById("feedStopMid");
 const feedDoneBtn = document.getElementById("feedDone");
 
@@ -37,6 +39,8 @@ let feedsUnsub = null;
 let active = null;
 /** @type {{ feedId: string | null, side1: "L" | "R" | null, duration1Sec: number | null }} */
 let pendingFeed = { feedId: null, side1: null, duration1Sec: null };
+/** @type {{ L: number, R: number }} */
+let accumMs = { L: 0, R: 0 };
 /** @type {number | null} */
 let tick = null;
 /** @type {number | null} */
@@ -114,6 +118,12 @@ function computeActiveDurationSec() {
   return Math.max(0, Math.round(computeActiveRunningMs() / 1000));
 }
 
+function iconFor(side) {
+  if (!active || active.side !== side) return "";
+  // show what will happen if you press again
+  return active.pausedAtPerf == null ? "⏸" : "▶";
+}
+
 function renderFeedButtons() {
   const activeSide = active?.side ?? null;
   const running = activeSide !== null && active?.pausedAtPerf == null;
@@ -122,6 +132,8 @@ function renderFeedButtons() {
   const elapsedText = formatElapsed(computeActiveRunningMs());
   if (feedLeftLabel) feedLeftLabel.textContent = activeSide === "L" ? elapsedText : "Left";
   if (feedRightLabel) feedRightLabel.textContent = activeSide === "R" ? elapsedText : "Right";
+  if (feedLeftIcon) feedLeftIcon.textContent = iconFor("L");
+  if (feedRightIcon) feedRightIcon.textContent = iconFor("R");
 
   feedLeftBtn.classList.toggle("is-active", activeSide === "L");
   feedRightBtn.classList.toggle("is-active", activeSide === "R");
@@ -166,6 +178,23 @@ function togglePause() {
   renderFeedButtons();
 }
 
+function pauseRunningSide() {
+  if (!active) return;
+  const ms = computeActiveRunningMs();
+  accumMs[active.side] += ms;
+  active = null;
+  if (tick != null) {
+    clearInterval(tick);
+    tick = null;
+  }
+}
+
+function currentSideTotalDurationSec(side) {
+  const baseMs = accumMs[side];
+  const extraMs = active?.side === side ? computeActiveRunningMs() : 0;
+  return Math.max(0, Math.round((baseMs + extraMs) / 1000));
+}
+
 async function stopActiveAndSave() {
   if (!active || !supabase) return;
   if (tick != null) {
@@ -173,11 +202,14 @@ async function stopActiveAndSave() {
     tick = null;
   }
 
-  const durationSec = computeActiveDurationSec();
+  // Stop this side permanently and save its total (including any previously paused segments)
+  accumMs[active.side] += computeActiveRunningMs();
+  const durationSec = currentSideTotalDurationSec(active.side);
   const side = active.side;
   const startedAtMs = active.startedWallMs;
   active = null;
   renderFeedButtons();
+  accumMs[side] = 0;
 
   setSyncMessage("Saving…");
   try {
@@ -207,8 +239,8 @@ async function onPressSide(side) {
     togglePause();
     return;
   }
-  // switching sides: stop current boob, then immediately start next
-  await stopActiveAndSave();
+  // switching sides: PAUSE current boob (do not save), start next
+  pauseRunningSide();
   startSide(side);
 }
 
@@ -219,6 +251,7 @@ function resetFlow() {
   }
   active = null;
   pendingFeed = { feedId: null, side1: null, duration1Sec: null };
+  accumMs = { L: 0, R: 0 };
   if (feedingSummary) feedingSummary.textContent = "";
   renderFeedButtons();
 }
