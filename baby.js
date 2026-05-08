@@ -13,6 +13,7 @@ const loginSubmitBtn = document.getElementById("loginSubmit");
 
 const feedLeftBtn = document.getElementById("feedLeft");
 const feedRightBtn = document.getElementById("feedRight");
+const feedPauseBtn = document.getElementById("feedPause");
 const feedStopBtn = document.getElementById("feedStop");
 const feedAddLeftBtn = document.getElementById("feedAddLeft");
 const feedAddRightBtn = document.getElementById("feedAddRight");
@@ -21,11 +22,13 @@ const feedDoneBtn = document.getElementById("feedDone");
 const feedingStateIdle = document.getElementById("feedingStateIdle");
 const feedingStateRunning = document.getElementById("feedingStateRunning");
 const feedingStateAfter = document.getElementById("feedingStateAfter");
+const feedingRunningWrap = document.getElementById("feedingRunningWrap");
 const feedingRunningLabel = document.getElementById("feedingRunningLabel");
 const feedingElapsed = document.getElementById("feedingElapsed");
 const feedingSummary = document.getElementById("feedingSummary");
 const feedTimeSinceEl = document.getElementById("feedTimeSince");
 const feedTimeToEl = document.getElementById("feedTimeTo");
+const feedTimeToHint = document.getElementById("feedTimeToHint");
 
 const feedsListEl = document.getElementById("feedsList");
 const feedsEmptyEl = document.getElementById("feedsEmpty");
@@ -37,7 +40,7 @@ let feeds = [];
 /** @type {null | (() => void)} */
 let feedsUnsub = null;
 
-/** @type {null | { phase: "side1" | "side2", startedPerf: number, startedWallMs: number, side: "L" | "R", feedId?: string, side1DurationSec?: number, side1?: "L" | "R" }} */
+/** @type {null | { phase: "side1" | "side2", startedPerf: number, startedWallMs: number, side: "L" | "R", pausedAtPerf: number | null, pausedTotalMs: number, feedId?: string, side1DurationSec?: number, side1?: "L" | "R" }} */
 let active = null;
 /** @type {number | null} */
 let tick = null;
@@ -196,11 +199,13 @@ function showState(name) {
   feedingStateIdle.hidden = name !== "idle";
   feedingStateRunning.hidden = name !== "running";
   feedingStateAfter.hidden = name !== "after";
+  if (feedingRunningWrap) feedingRunningWrap.hidden = name !== "running";
 }
 
 function setControlsEnabled(on) {
   feedLeftBtn.disabled = !on;
   feedRightBtn.disabled = !on;
+  if (feedPauseBtn) feedPauseBtn.disabled = !on;
   feedStopBtn.disabled = !on;
   feedAddLeftBtn.disabled = !on;
   feedAddRightBtn.disabled = !on;
@@ -209,7 +214,10 @@ function setControlsEnabled(on) {
 
 function updateTick() {
   if (!active) return;
-  const ms = performance.now() - active.startedPerf;
+  const now = performance.now();
+  const runningMs =
+    (active.pausedAtPerf == null ? now : active.pausedAtPerf) - active.startedPerf - active.pausedTotalMs;
+  const ms = Math.max(0, runningMs);
   feedingElapsed.textContent = formatElapsed(ms);
 }
 
@@ -219,14 +227,30 @@ function startPhase(phase, side) {
     side,
     startedPerf: performance.now(),
     startedWallMs: Date.now(),
+    pausedAtPerf: null,
+    pausedTotalMs: 0,
     ...(active && active.feedId ? { feedId: active.feedId, side1: active.side1, side1DurationSec: active.side1DurationSec } : {}),
   };
   feedingRunningLabel.textContent =
     phase === "side1" ? `Feeding ${side}…` : `Other side ${side}…`;
   feedingElapsed.textContent = "0:00";
+  if (feedPauseBtn) feedPauseBtn.textContent = "Pause";
   showState("running");
   if (tick != null) clearInterval(tick);
   tick = window.setInterval(updateTick, 250);
+}
+
+function togglePause() {
+  if (!active) return;
+  if (active.pausedAtPerf == null) {
+    active.pausedAtPerf = performance.now();
+    if (feedPauseBtn) feedPauseBtn.textContent = "Resume";
+  } else {
+    active.pausedTotalMs += Math.max(0, performance.now() - active.pausedAtPerf);
+    active.pausedAtPerf = null;
+    if (feedPauseBtn) feedPauseBtn.textContent = "Pause";
+  }
+  updateTick();
 }
 
 async function stopPhase() {
@@ -235,7 +259,10 @@ async function stopPhase() {
     clearInterval(tick);
     tick = null;
   }
-  const durationSec = Math.max(0, Math.round((performance.now() - active.startedPerf) / 1000));
+  const now = performance.now();
+  const runningMs =
+    (active.pausedAtPerf == null ? now : active.pausedAtPerf) - active.startedPerf - active.pausedTotalMs;
+  const durationSec = Math.max(0, Math.round(Math.max(0, runningMs) / 1000));
 
   if (active.phase === "side1") {
     setSyncMessage("Saving…");
@@ -368,6 +395,7 @@ async function onSignedIn() {
 // Event wiring
 feedLeftBtn.addEventListener("click", () => startPhase("side1", "L"));
 feedRightBtn.addEventListener("click", () => startPhase("side1", "R"));
+feedPauseBtn?.addEventListener("click", () => togglePause());
 feedStopBtn.addEventListener("click", () => void stopPhase());
 feedAddLeftBtn.addEventListener("click", () => startPhase("side2", "L"));
 feedAddRightBtn.addEventListener("click", () => startPhase("side2", "R"));

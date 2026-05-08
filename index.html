@@ -25,70 +25,78 @@
         </div>
       </header>
 
-      <main class="baby-layout">
-        <section class="baby-section" aria-labelledby="quickTitle">
-          <h2 class="baby-section-title" id="quickTitle">Quick actions</h2>
-          <div class="quick-grid" role="list">
-            <button class="quick-tile" type="button" disabled role="listitem">Plassen</button>
-            <button class="quick-tile" type="button" disabled role="listitem">Poepen</button>
-            <button class="quick-tile" type="button" disabled role="listitem">Temp</button>
-            <button class="quick-tile is-active" type="button" id="openFeeding" role="listitem">Voeding</button>
-            <button class="quick-tile" type="button" disabled role="listitem">Bad</button>
-            <button class="quick-tile" type="button" disabled role="listitem">Slaapje</button>
-          </div>
-        </section>
+      <div class="app-layout">
+        <div class="app-panel app-panel--control">
+          <section class="stats" aria-label="Feeding summary">
+            <div class="stat-card baby-stat-card">
+              <div class="stat-label">Time since last feed</div>
+              <div class="stat-value" id="feedTimeSince">—</div>
+              <div class="stat-hint">Target: every 3 hours</div>
+            </div>
+            <div class="stat-card baby-stat-card">
+              <div class="stat-label">Time to next feed</div>
+              <div class="stat-value" id="feedTimeTo">—</div>
+              <div class="stat-hint" id="feedTimeToHint"></div>
+            </div>
+          </section>
 
-        <section class="baby-section" aria-labelledby="feedingTitle" id="feedingPanel">
-          <div class="baby-section-head">
-            <h2 class="baby-section-title" id="feedingTitle">Voeding</h2>
-            <p class="baby-section-sub">Borst links/rechts. Fles komt later.</p>
-          </div>
-
-          <div class="feeding-card" aria-live="polite">
-            <div class="feeding-metrics" aria-label="Feeding summary">
-              <div class="feeding-metric">
-                <div class="feeding-metric-label">Time since</div>
-                <div class="feeding-metric-value" id="feedTimeSince">—</div>
-              </div>
-              <div class="feeding-metric">
-                <div class="feeding-metric-label">Time to</div>
-                <div class="feeding-metric-value" id="feedTimeTo">—</div>
-              </div>
+          <section class="timer-zone" aria-label="Feeding controls">
+            <div id="feedingRunningWrap" class="elapsed" hidden aria-live="polite">
+              <span class="elapsed-value" id="feedingElapsed">0:00</span>
+              <span class="elapsed-hint" id="feedingRunningLabel">Feeding…</span>
             </div>
 
-            <div class="feeding-state" id="feedingStateIdle">
-              <div class="feeding-prompt">Tap a side to start.</div>
-              <div class="feeding-actions">
-                <button type="button" class="btn-primary feeding-side" id="feedLeft">Left</button>
-                <button type="button" class="btn-primary feeding-side" id="feedRight">Right</button>
-              </div>
+            <div class="feeding-main-buttons" id="feedingStateIdle">
+              <button type="button" class="main-btn feeding-main-btn feeding-main-btn--left" id="feedLeft">
+                <span class="main-btn-label">Left</span>
+              </button>
+              <button type="button" class="main-btn feeding-main-btn feeding-main-btn--right" id="feedRight">
+                <span class="main-btn-label">Right</span>
+              </button>
             </div>
 
-            <div class="feeding-state" id="feedingStateRunning" hidden>
-              <div class="feeding-running-label" id="feedingRunningLabel">Feeding…</div>
-              <div class="feeding-elapsed" id="feedingElapsed">0:00</div>
-              <button type="button" class="btn-primary feeding-stop" id="feedStop">Stop</button>
+            <div class="feeding-main-actions" id="feedingStateRunning" hidden>
+              <button type="button" class="btn-secondary feeding-action-btn" id="feedPause">Pause</button>
+              <button type="button" class="btn-primary feeding-action-btn" id="feedStop">Stop</button>
             </div>
 
-            <div class="feeding-state" id="feedingStateAfter" hidden>
+            <div class="feeding-main-actions" id="feedingStateAfter" hidden>
               <div class="feeding-summary" id="feedingSummary"></div>
               <div class="feeding-actions feeding-actions--after">
-                <button type="button" class="btn-primary feeding-add-other" id="feedAddLeft">Add Left</button>
-                <button type="button" class="btn-primary feeding-add-other" id="feedAddRight">Add Right</button>
+                <button type="button" class="main-btn feeding-main-btn feeding-main-btn--left" id="feedAddLeft">
+                  <span class="main-btn-label">Left</span>
+                </button>
+                <button type="button" class="main-btn feeding-main-btn feeding-main-btn--right" id="feedAddRight">
+                  <span class="main-btn-label">Right</span>
+                </button>
               </div>
-              <button type="button" class="btn-secondary feeding-done" id="feedDone">Done</button>
+              <button type="button" class="btn-secondary feeding-action-btn" id="feedDone">Done</button>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="baby-section" aria-labelledby="feedsRecentTitle">
-          <div class="baby-section-head">
-            <h2 class="baby-section-title" id="feedsRecentTitle">Recent feeds</h2>
-          </div>
-          <ul class="feed-list" id="feedsList"></ul>
-          <p class="history-empty" id="feedsEmpty">No feeds logged yet.</p>
-        </section>
-      </main>
+          <section class="baby-section" aria-label="Coming soon">
+            <h2 class="baby-section-title">Quick actions</h2>
+            <div class="quick-grid" role="list">
+              <button class="quick-tile" type="button" disabled role="listitem">Plassen</button>
+              <button class="quick-tile" type="button" disabled role="listitem">Poepen</button>
+              <button class="quick-tile" type="button" disabled role="listitem">Temp</button>
+              <button class="quick-tile is-active" type="button" disabled role="listitem">Voeding</button>
+              <button class="quick-tile" type="button" disabled role="listitem">Bad</button>
+              <button class="quick-tile" type="button" disabled role="listitem">Slaapje</button>
+            </div>
+          </section>
+        </div>
+
+        <div class="app-panel app-panel--history">
+          <section class="history-section" aria-labelledby="feedsRecentTitle">
+            <div class="history-toolbar">
+              <h2 id="feedsRecentTitle" class="history-heading">Feeds</h2>
+            </div>
+            <ul class="feed-list" id="feedsList"></ul>
+            <p class="history-empty" id="feedsEmpty">No feeds logged yet.</p>
+          </section>
+        </div>
+      </div>
     </div>
 
     <dialog class="options-dialog login-dialog" id="loginDialog" aria-labelledby="loginTitle" aria-modal="true">

@@ -845,6 +845,55 @@ body.app-loading .main-btn {
   margin: 0 auto;
 }
 
+.baby-stat-card + .baby-stat-card {
+  margin-top: 10px;
+}
+
+.feeding-main-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+}
+
+.feeding-main-btn {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feeding-main-btn .main-btn-label {
+  font-size: 1.25rem;
+}
+
+.feeding-main-btn--left {
+  background: color-mix(in srgb, var(--accent) 92%, white);
+}
+
+.feeding-main-btn--right {
+  background: color-mix(in srgb, var(--accent) 75%, var(--surface));
+}
+
+.feeding-main-actions {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.feeding-action-btn {
+  min-width: 140px;
+  justify-content: center;
+}
+
+.feeding-summary {
+  width: 100%;
+  text-align: center;
+}
 .baby-section {
   background: color-mix(in srgb, var(--surface) 65%, transparent);
   border: 1px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
