@@ -24,6 +24,8 @@ const feedingStateAfter = document.getElementById("feedingStateAfter");
 const feedingRunningLabel = document.getElementById("feedingRunningLabel");
 const feedingElapsed = document.getElementById("feedingElapsed");
 const feedingSummary = document.getElementById("feedingSummary");
+const feedTimeSinceEl = document.getElementById("feedTimeSince");
+const feedTimeToEl = document.getElementById("feedTimeTo");
 
 const feedsListEl = document.getElementById("feedsList");
 const feedsEmptyEl = document.getElementById("feedsEmpty");
@@ -39,6 +41,10 @@ let feedsUnsub = null;
 let active = null;
 /** @type {number | null} */
 let tick = null;
+/** @type {number | null} */
+let metricsTick = null;
+
+const FEED_TARGET_INTERVAL_MS = 3 * 60 * 60 * 1000;
 
 function useCloud() {
   const u = String(window.SUPABASE_URL || "").trim();
@@ -99,6 +105,39 @@ function formatTimeOnly(ms) {
   return `${hh}:${mm}`;
 }
 
+function totalDurationSec(feed) {
+  return feed.duration1Sec + (feed.duration2Sec || 0);
+}
+
+function lastFeedEndMs() {
+  if (feeds.length === 0) return null;
+  const f = feeds[0];
+  return f.startedAtMs + totalDurationSec(f) * 1000;
+}
+
+function renderFeedingMetrics() {
+  if (!feedTimeSinceEl || !feedTimeToEl) return;
+  const endMs = lastFeedEndMs();
+  if (endMs == null) {
+    feedTimeSinceEl.textContent = "—";
+    feedTimeToEl.textContent = "—";
+    feedTimeToEl.classList.remove("feeding-metric-value--overdue");
+    return;
+  }
+
+  const sinceMs = Math.max(0, Date.now() - endMs);
+  feedTimeSinceEl.textContent = formatElapsed(sinceMs);
+
+  const remainingMs = FEED_TARGET_INTERVAL_MS - sinceMs;
+  if (remainingMs <= 0) {
+    feedTimeToEl.textContent = `${formatElapsed(-remainingMs)} overdue`;
+    feedTimeToEl.classList.add("feeding-metric-value--overdue");
+  } else {
+    feedTimeToEl.textContent = formatElapsed(remainingMs);
+    feedTimeToEl.classList.remove("feeding-metric-value--overdue");
+  }
+}
+
 function renderFeeds() {
   feedsListEl.innerHTML = "";
   feedsEmptyEl.hidden = feeds.length > 0;
@@ -125,6 +164,7 @@ function renderFeeds() {
     li.append(title, meta);
     feedsListEl.appendChild(li);
   }
+  renderFeedingMetrics();
 }
 
 function showState(name) {
@@ -239,6 +279,10 @@ async function signOut() {
   if (!supabase) return;
   feedsUnsub?.();
   feedsUnsub = null;
+  if (metricsTick != null) {
+    clearInterval(metricsTick);
+    metricsTick = null;
+  }
   await supabase.auth.signOut();
   feeds = [];
   renderFeeds();
@@ -281,6 +325,8 @@ async function onSignedIn() {
   setSyncMessage("");
   feeds = await pullFeeds(supabase);
   renderFeeds();
+  if (metricsTick != null) clearInterval(metricsTick);
+  metricsTick = window.setInterval(renderFeedingMetrics, 1000);
   feedsUnsub?.();
   feedsUnsub = subscribeFeedsRealtime(
     supabase,

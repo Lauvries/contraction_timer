@@ -907,6 +907,41 @@ body.app-loading .main-btn {
   border: 1px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
 }
 
+.feeding-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 0.85rem;
+}
+
+.feeding-metric {
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
+  padding: 0.6rem 0.7rem;
+  min-width: 0;
+}
+
+.feeding-metric-label {
+  font-size: 0.7rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.feeding-metric-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.feeding-metric-value--overdue {
+  color: var(--danger);
+}
+
 .feeding-prompt {
   font-weight: 750;
   margin-bottom: 0.65rem;

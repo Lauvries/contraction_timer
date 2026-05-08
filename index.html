@@ -45,6 +45,17 @@
           </div>
 
           <div class="feeding-card" aria-live="polite">
+            <div class="feeding-metrics" aria-label="Feeding summary">
+              <div class="feeding-metric">
+                <div class="feeding-metric-label">Time since</div>
+                <div class="feeding-metric-value" id="feedTimeSince">—</div>
+              </div>
+              <div class="feeding-metric">
+                <div class="feeding-metric-label">Time to</div>
+                <div class="feeding-metric-value" id="feedTimeTo">—</div>
+              </div>
+            </div>
+
             <div class="feeding-state" id="feedingStateIdle">
               <div class="feeding-prompt">Tap a side to start.</div>
               <div class="feeding-actions">
