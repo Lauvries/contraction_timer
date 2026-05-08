@@ -301,7 +301,10 @@ function currentSideTotalDurationSec(side) {
 }
 
 async function stopActiveAndFinalizeFeed() {
-  if (!supabase) return;
+  if (!supabase) {
+    setSyncMessage("Not connected to Supabase yet — sign in and refresh.", true);
+    return;
+  }
   if (!active && accumMs.L === 0 && accumMs.R === 0) return;
   if (tick != null) {
     clearInterval(tick);
@@ -349,7 +352,6 @@ async function stopActiveAndFinalizeFeed() {
 }
 
 async function onPressSide(side) {
-  if (!supabase) return;
   if (!active) {
     startSide(side);
     return;
