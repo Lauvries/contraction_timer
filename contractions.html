@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a1523" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Contraction timer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <nav class="top-nav" aria-label="Primary">
+        <a class="top-nav-link" href="./index.html">Baby</a>
+        <span class="top-nav-sep" aria-hidden="true">·</span>
+        <a class="top-nav-link is-active" href="./contractions.html" aria-current="page">Contractions</a>
+      </nav>
+
+      <div class="app-layout">
+        <div class="app-panel app-panel--control">
+          <header class="header">
+            <h1 class="title">Contraction timer</h1>
+            <p id="syncStatus" class="sync-status" hidden></p>
+            <button type="button" class="header-options-btn" id="openOptions" aria-haspopup="dialog">
+              Options
+            </button>
+          </header>
+
+          <section class="stats" aria-label="Summary">
+            <div class="stat-card">
+              <div class="stat-label">Avg time between last 5</div>
+              <div class="stat-value" id="avgInterval">—</div>
+              <div class="stat-hint" id="avgIntervalHint"></div>
+            </div>
+          </section>
+
+          <section class="timer-zone">
+            <div id="elapsed" class="elapsed" hidden aria-live="polite">
+              <span class="elapsed-value" id="elapsedValue">0:00</span>
+              <span class="elapsed-hint">since start</span>
+              <span id="targetLine" class="elapsed-target" hidden></span>
+            </div>
+            <button type="button" id="mainBtn" class="main-btn" aria-pressed="false">
+              <span class="main-btn-label" id="mainBtnLabel">Log contraction</span>
+            </button>
+          </section>
+        </div>
+
+        <div class="app-panel app-panel--history">
+          <section class="history-section" aria-labelledby="history-heading">
+            <div class="history-toolbar">
+              <h2 id="history-heading" class="history-heading">Recent</h2>
+              <button type="button" id="clearAllBtn" class="history-clear-all" hidden>
+                Clear all
+              </button>
+            </div>
+            <ul id="historyList" class="history-list"></ul>
+            <p id="historyEmpty" class="history-empty">No contractions logged yet.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <dialog class="options-dialog login-dialog" id="loginDialog" aria-labelledby="loginTitle" aria-modal="true">
+      <form class="options-form" id="loginForm">
+        <h2 id="loginTitle" class="options-title">Sign in</h2>
+        <p class="options-intro">
+          Same email and password as in Supabase (Authentication → Users). Enables sync on this and other devices.
+        </p>
+        <div class="options-field">
+          <label class="options-label" for="loginEmail">Email</label>
+          <div class="options-number-wrap login-field-wrap">
+            <input
+              id="loginEmail"
+              name="email"
+              class="options-input"
+              type="email"
+              autocomplete="username"
+              required
+            />
+          </div>
+        </div>
+        <div class="options-field">
+          <label class="options-label" for="loginPassword">Password</label>
+          <div class="options-number-wrap login-field-wrap">
+            <input
+              id="loginPassword"
+              name="password"
+              class="options-input"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+        </div>
+        <p id="loginError" class="options-hint login-error" hidden></p>
+        <div class="options-actions login-actions">
+          <button type="submit" class="btn-primary login-submit" id="loginSubmit">Sign in</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="options-dialog" id="optionsDialog" aria-labelledby="optionsTitle">
+      <form method="dialog" class="options-form" id="optionsForm">
+        <h2 id="optionsTitle" class="options-title">Options</h2>
+
+        <div class="options-field options-field--live-timer">
+          <label class="toggle-label toggle-label--in-form">
+            <span class="toggle-text">Live timer</span>
+            <input type="checkbox" id="liveTimerToggle" class="toggle-input" />
+            <span class="toggle-switch" aria-hidden="true"></span>
+          </label>
+          <p class="options-hint options-hint--timer" id="timerModeHint"></p>
+        </div>
+
+        <p class="options-intro">
+          Optional target length while the live timer is on. Shown during tracking; you still tap Stop yourself.
+        </p>
+        <div class="options-field">
+          <label class="options-label" for="targetMinutes">Target length (optional)</label>
+          <div class="options-duration-row">
+            <div class="options-number-wrap">
+              <input
+                id="targetMinutes"
+                name="targetMinutes"
+                class="options-input"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                max="59"
+                step="1"
+                placeholder="min"
+                aria-label="Minutes"
+              />
+              <span class="options-suffix">min</span>
+            </div>
+            <div class="options-number-wrap">
+              <input
+                id="targetSeconds"
+                name="targetSeconds"
+                class="options-input"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                max="59"
+                step="1"
+                placeholder="sec"
+                aria-label="Seconds"
+              />
+              <span class="options-suffix">sec</span>
+            </div>
+          </div>
+          <p class="options-hint">Leave both empty to turn off. Max 59:59 per field.</p>
+        </div>
+        <div class="options-actions">
+          <button type="button" class="btn-secondary" id="signOutBtn" hidden>Sign out</button>
+          <button type="button" class="btn-secondary" id="clearTarget">Clear target</button>
+          <button type="submit" class="btn-primary">Done</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="supabase-config.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
