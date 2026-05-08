@@ -305,19 +305,23 @@ function renderFeedingMetrics() {
     feedTimeSinceEl.textContent = "—";
     feedTimeToEl.textContent = "—";
     feedTimeToEl.classList.remove("feeding-metric-value--overdue");
+    if (feedTimeToHint) feedTimeToHint.textContent = "";
     return;
   }
 
   const sinceMs = Math.max(0, Date.now() - endMs);
   feedTimeSinceEl.textContent = formatElapsed(sinceMs);
 
-  const remainingMs = FEED_TARGET_INTERVAL_MS - sinceMs;
+  const dueMs = endMs + FEED_TARGET_INTERVAL_MS;
+  feedTimeToEl.textContent = formatTimeOnly(dueMs);
+
+  const remainingMs = dueMs - Date.now();
   if (remainingMs <= 0) {
-    feedTimeToEl.textContent = `${formatHoursMinutes(-remainingMs)} overdue`;
     feedTimeToEl.classList.add("feeding-metric-value--overdue");
+    if (feedTimeToHint) feedTimeToHint.textContent = `${formatHoursMinutes(-remainingMs)} overdue`;
   } else {
-    feedTimeToEl.textContent = formatHoursMinutes(remainingMs);
     feedTimeToEl.classList.remove("feeding-metric-value--overdue");
+    if (feedTimeToHint) feedTimeToHint.textContent = `${formatHoursMinutes(remainingMs)} to go`;
   }
 }
 
