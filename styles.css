@@ -928,12 +928,15 @@ body.app-loading .main-btn {
 
 .feeding-main-btn .main-btn-label {
   font-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .feeding-btn-icon {
-  position: absolute;
-  right: 18px;
-  bottom: 16px;
+  position: static;
   font-size: 1.05rem;
   font-weight: 900;
   line-height: 1;
