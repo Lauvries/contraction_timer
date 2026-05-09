@@ -24,7 +24,6 @@ const feedLeftIcon = document.getElementById("feedLeftIcon");
 const feedRightIcon = document.getElementById("feedRightIcon");
 const feedStopMidBtn = document.getElementById("feedStopMid");
 
-const feedingSummary = document.getElementById("feedingSummary");
 const feedTimeSinceEl = document.getElementById("feedTimeSince");
 const feedTimeToEl = document.getElementById("feedTimeTo");
 const feedTimeToHint = document.getElementById("feedTimeToHint");
@@ -344,6 +343,13 @@ function renderFeedButtons() {
   feedLeftBtn.classList.toggle("is-paused", paused && activeSide === "L");
   feedRightBtn.classList.toggle("is-paused", paused && activeSide === "R");
 
+  const lastFedHighlight =
+    activeSide ??
+    lastFedSideThisSession ??
+    (lMs > 0 && rMs <= 0 ? "L" : rMs > 0 && lMs <= 0 ? "R" : null);
+  feedLeftBtn.classList.toggle("feeding-last-fed", lastFedHighlight === "L");
+  feedRightBtn.classList.toggle("feeding-last-fed", lastFedHighlight === "R");
+
   if (feedStopMidBtn) feedStopMidBtn.disabled = lMs <= 0 && rMs <= 0 && !activeSide;
 
   // Beep on each 5-minute boundary for the currently running side.
@@ -355,8 +361,6 @@ function renderFeedButtons() {
       beep();
     }
   }
-
-  renderFeedingSummary();
 }
 
 function updateTick() {
@@ -500,40 +504,6 @@ function pauseRunningSide() {
   persistFeedFlowState();
 }
 
-function currentSideTotalDurationSec(side) {
-  const baseMs = accumMs[side];
-  const extraMs = active?.side === side ? computeActiveRunningMs() : 0;
-  return Math.max(0, Math.round((baseMs + extraMs) / 1000));
-}
-
-/** Live line under the timer while timing or continuing a saved feed; leaves prior text after Stop when idle. */
-function renderFeedingSummary() {
-  if (!feedingSummary) return;
-  const hasSession =
-    Boolean(active) ||
-    accumMs.L > 0 ||
-    accumMs.R > 0 ||
-    editingExistingFeedId != null;
-  if (!hasSession) return;
-
-  const lSec = currentSideTotalDurationSec("L");
-  const rSec = currentSideTotalDurationSec("R");
-  const parts = [];
-  if (lSec > 0) parts.push(`L ${formatDurationSec(lSec)}`);
-  if (rSec > 0) parts.push(`R ${formatDurationSec(rSec)}`);
-  if (parts.length === 0) {
-    feedingSummary.textContent = "";
-    return;
-  }
-
-  const lastLive =
-    active?.side ??
-    lastFedSideThisSession ??
-    (lSec > 0 && rSec <= 0 ? "L" : rSec > 0 && lSec <= 0 ? "R" : sessionFirstSide ? otherSide(sessionFirstSide) : "L");
-
-  feedingSummary.textContent = `${parts.join(" · ")} · Last: ${lastLive}`;
-}
-
 function activateFeedForEditing(feed) {
   if (!feed) return;
   // If user is in the middle of a different session, confirm switching.
@@ -632,11 +602,6 @@ async function stopActiveAndFinalizeFeed() {
       } else {
         await insertFeed(supabase, { startedAtMs, side1, duration1Sec });
       }
-    }
-
-    const lastLabel = d2 > 0 && side2 ? side2 : side1;
-    if (feedingSummary) {
-      feedingSummary.textContent = formatFeedSummaryLine(side1, duration1Sec, side2, d2, lastLabel);
     }
 
     renderFeeds();
@@ -738,20 +703,17 @@ function inferLastFedFromFeed(f) {
   return f.side1;
 }
 
-/** Last pill in list: canonical row has side2 = last when both sides have time. */
-function displayLastFedSide(f) {
-  return inferLastFedFromFeed(f);
+function durationSecForBreast(f, side) {
+  if (f.side1 === side) return f.duration1Sec;
+  if (f.side2 === side) return f.duration2Sec ?? 0;
+  return 0;
 }
 
-/** One-line summary under the timer: per-breast totals + Last (letters side1/side2 are L/R labels). */
-function formatFeedSummaryLine(side1Letter, d1, side2Letter, d2, lastLetter) {
-  const lSec = side1Letter === "L" ? d1 : d2;
-  const rSec = side1Letter === "R" ? d1 : d2;
-  const parts = [];
-  if (lSec > 0) parts.push(`L ${formatDurationSec(lSec)}`);
-  if (rSec > 0) parts.push(`R ${formatDurationSec(rSec)}`);
-  const basis = parts.join(" · ");
-  return `${basis} · Last: ${lastLetter}`;
+/** Map fixed L/R column to existing side1/side2 editor keys. */
+function durationEditKeyForBreast(f, side) {
+  if (f.side1 === side) return "side1";
+  if (f.side2 === side) return "side2";
+  return "side2_add";
 }
 
 function lastFeedEndMs() {
@@ -992,27 +954,34 @@ function renderFeeds() {
       sep.textContent = "·";
       sep.setAttribute("aria-hidden", "true");
 
-      const dur1 = document.createElement("button");
-      dur1.type = "button";
-      dur1.className = "history-meta-btn history-meta-btn--dur";
-      dur1.textContent = `${f.side1}: ${formatDurationSec(f.duration1Sec)}`;
-      dur1.title = "Edit duration";
-      dur1.addEventListener("click", () => {
+      const lDurSec = durationSecForBreast(f, "L");
+      const rDurSec = durationSecForBreast(f, "R");
+      const lastFedRow = inferLastFedFromFeed(f);
+
+      const durL = document.createElement("button");
+      durL.type = "button";
+      durL.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--L${lDurSec <= 0 ? " is-placeholder" : ""}${
+        lastFedRow === "L" ? " is-last-fed" : ""
+      }`;
+      durL.textContent = lDurSec > 0 ? `L: ${formatDurationSec(lDurSec)}` : "—";
+      durL.title = lDurSec > 0 ? "Edit L duration" : "Add L duration";
+      durL.addEventListener("click", () => {
         editingFeedDurationId = f.id;
-        editingFeedDurationSide = "side1";
+        editingFeedDurationSide = durationEditKeyForBreast(f, "L");
         editingFeedTimeId = null;
         renderFeeds();
       });
 
-      const dur2 = document.createElement("button");
-      dur2.type = "button";
-      dur2.className = `history-meta-btn history-meta-btn--dur${f.side2 ? "" : " is-placeholder"}`;
-      dur2.textContent = f.side2 ? `${f.side2}: ${formatDurationSec(f.duration2Sec || 0)}` : "—";
-      dur2.title = f.side2 ? "Edit duration" : `Add ${otherSide(f.side1)} duration`;
-      dur2.disabled = false;
-      dur2.addEventListener("click", () => {
+      const durR = document.createElement("button");
+      durR.type = "button";
+      durR.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--R${rDurSec <= 0 ? " is-placeholder" : ""}${
+        lastFedRow === "R" ? " is-last-fed" : ""
+      }`;
+      durR.textContent = rDurSec > 0 ? `R: ${formatDurationSec(rDurSec)}` : "—";
+      durR.title = rDurSec > 0 ? "Edit R duration" : "Add R duration";
+      durR.addEventListener("click", () => {
         editingFeedDurationId = f.id;
-        editingFeedDurationSide = f.side2 ? "side2" : "side2_add";
+        editingFeedDurationSide = durationEditKeyForBreast(f, "R");
         editingFeedTimeId = null;
         renderFeeds();
       });
@@ -1022,10 +991,6 @@ function renderFeeds() {
       const total = document.createElement("span");
       total.className = "feed-total-pill";
       total.textContent = totalText;
-
-      const last = document.createElement("span");
-      last.className = "feed-last-pill";
-      last.textContent = `Last: ${displayLastFedSide(f)}`;
 
       const del = document.createElement("button");
       del.type = "button";
@@ -1051,7 +1016,7 @@ function renderFeeds() {
       top.className = "feed-meta-top";
       const start = document.createElement("div");
       start.className = "feed-meta-start";
-      start.append(timeBtn, sep, last);
+      start.append(timeBtn, sep);
       const actions = document.createElement("div");
       actions.className = "feed-meta-actions";
       actions.append(total, del);
@@ -1059,7 +1024,7 @@ function renderFeeds() {
 
       const durations = document.createElement("div");
       durations.className = "feed-meta-durations";
-      durations.append(dur1, dur2);
+      durations.append(durL, durR);
 
       rowMeta.append(top, durations);
     }

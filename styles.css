@@ -687,10 +687,10 @@ body.app-loading .main-btn {
 }
 
 .feed-meta-durations {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: stretch;
+  column-gap: 8px;
   min-width: 0;
   padding-top: 6px;
   margin-top: 2px;
@@ -702,6 +702,13 @@ body.app-loading .main-btn {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.history-meta-btn--dur.is-last-fed {
+  border-width: 3px;
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .history-meta-spacer {
@@ -1046,6 +1053,10 @@ body.app-loading .main-btn {
     background 0.2s;
 }
 
+.feeding-main-btn.feeding-last-fed {
+  border-width: 6px;
+}
+
 .feeding-main-btn .main-btn-label {
   font-size: 1.25rem;
   display: inline-flex;
@@ -1086,10 +1097,6 @@ body.app-loading .main-btn {
   justify-content: center;
 }
 
-.feeding-summary {
-  width: 100%;
-  text-align: center;
-}
 .baby-section {
   background: color-mix(in srgb, var(--surface) 65%, transparent);
   border: 1px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
@@ -1231,12 +1238,6 @@ body.app-loading .main-btn {
   font-size: 1rem;
 }
 
-.feeding-summary {
-  font-size: 0.95rem;
-  font-weight: 750;
-  margin-bottom: 0.75rem;
-}
-
 .feeding-add-other {
   width: 100%;
   border-radius: 14px;
@@ -1314,18 +1315,6 @@ body.app-loading .main-btn {
   color: var(--text-muted);
   background: color-mix(in srgb, var(--text) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--text-muted) 22%, transparent);
-  padding: 0.22rem 0.45rem;
-  border-radius: 999px;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-
-.feed-last-pill {
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: color-mix(in srgb, var(--accent) 85%, var(--text));
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
   padding: 0.22rem 0.45rem;
   border-radius: 999px;
   font-variant-numeric: tabular-nums;
