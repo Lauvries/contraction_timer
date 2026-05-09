@@ -135,12 +135,19 @@ export async function addSecondSide(supabase, id, patch) {
 /**
  * @param {import("@supabase/supabase-js").SupabaseClient} supabase
  * @param {string} id
- * @param {{ startedAtMs?: number, duration1Sec?: number, duration2Sec?: number | null }} patch
+ * @param {{ startedAtMs?: number, side1?: BreastSide, side2?: BreastSide | null, duration1Sec?: number, duration2Sec?: number | null }} patch
  */
 export async function updateFeed(supabase, id, patch) {
   const row = /** @type {Record<string, unknown>} */ ({});
   if (typeof patch.startedAtMs === "number" && Number.isFinite(patch.startedAtMs)) {
     row.started_at_ms = Math.floor(patch.startedAtMs);
+  }
+  if (patch.side1 === "L" || patch.side1 === "R") {
+    row.side1 = patch.side1;
+  }
+  if ("side2" in patch) {
+    if (patch.side2 == null || patch.side2 === undefined) row.side2 = null;
+    else if (patch.side2 === "L" || patch.side2 === "R") row.side2 = patch.side2;
   }
   if (typeof patch.duration1Sec === "number" && Number.isFinite(patch.duration1Sec)) {
     row.duration1_sec = Math.max(0, Math.floor(patch.duration1Sec));

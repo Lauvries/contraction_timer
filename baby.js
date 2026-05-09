@@ -584,16 +584,17 @@ async function stopActiveAndFinalizeFeed() {
   const lSec = Math.round(accumMs.L / 1000);
   const rSec = Math.round(accumMs.R / 1000);
   const startedAtMs = sessionStartedAtMs ?? Date.now();
-  const first = sessionFirstSide ?? (lSec > 0 ? "L" : "R");
 
-  /** @type {"L"|"R"} */ const side1 = first;
-  /** @type {"L"|"R"} */ const side2 = first === "L" ? "R" : "L";
-  const duration1Sec = side1 === "L" ? lSec : rSec;
-  const duration2Sec = side2 === "L" ? lSec : rSec;
+  const { side1, side2, duration1Sec, duration2Sec } = canonicalFeedStorageFromTotals(
+    lSec,
+    rSec,
+    lastFedSideAtFinalize
+  );
+  const d2 = duration2Sec ?? 0;
 
   setSyncMessage("Saving…");
   try {
-    if (duration1Sec <= 0 && duration2Sec <= 0) {
+    if (duration1Sec <= 0 && d2 <= 0) {
       setSyncMessage("");
       resetFlow();
       return;
@@ -604,45 +605,41 @@ async function stopActiveAndFinalizeFeed() {
       const target = feeds.find((x) => x.id === id) || null;
       if (!target) throw new Error("Could not find feed to update.");
 
-      await updateFeed(supabase, id, { startedAtMs, duration1Sec });
+      await updateFeed(supabase, id, {
+        startedAtMs,
+        side1,
+        side2: d2 > 0 ? side2 : null,
+        duration1Sec,
+        duration2Sec: d2 > 0 ? d2 : null,
+      });
 
-      if (duration2Sec > 0) {
-        if (target.side2) {
-          await updateFeed(supabase, id, { duration2Sec });
-        } else {
-          await addSecondSide(supabase, id, { side2, duration2Sec });
-        }
-      } else if (target.side2) {
-        await updateFeed(supabase, id, { duration2Sec: 0 });
-      }
-
-      const lastHint = lastFedSideAtFinalize ?? (duration2Sec > 0 ? side2 : side1);
-
-      feeds = feeds.map((f) =>
-        f.id === id
-          ? {
-              ...f,
-              startedAtMs,
-              side1,
-              duration1Sec,
-              side2: duration2Sec > 0 ? side2 : null,
-              duration2Sec: duration2Sec > 0 ? duration2Sec : null,
-              _uiLastFedSide: lastHint,
-            }
-          : f
-      );
+      feeds = feeds.map((f) => {
+        if (f.id !== id) return f;
+        const next = {
+          ...f,
+          startedAtMs,
+          side1,
+          duration1Sec,
+          side2: d2 > 0 ? side2 : null,
+          duration2Sec: d2 > 0 ? d2 : null,
+        };
+        delete /** @type {any} */ (next)._uiLastFedSide;
+        return next;
+      });
     } else {
-      if (duration2Sec > 0) {
-        await insertFeed(supabase, { startedAtMs, side1, duration1Sec, side2, duration2Sec });
+      if (d2 > 0 && side2) {
+        await insertFeed(supabase, { startedAtMs, side1, duration1Sec, side2, duration2Sec: d2 });
       } else {
         await insertFeed(supabase, { startedAtMs, side1, duration1Sec });
       }
     }
 
-    const lastLabel = lastFedSideAtFinalize ?? (duration2Sec > 0 ? side2 : side1);
+    const lastLabel = d2 > 0 && side2 ? side2 : side1;
     if (feedingSummary) {
-      feedingSummary.textContent = formatFeedSummaryLine(side1, duration1Sec, side2, duration2Sec, lastLabel);
+      feedingSummary.textContent = formatFeedSummaryLine(side1, duration1Sec, side2, d2, lastLabel);
     }
+
+    renderFeeds();
 
     setSyncMessage("");
     resetFlow();
@@ -691,6 +688,49 @@ function otherSide(side) {
   return side === "L" ? "R" : "L";
 }
 
+/**
+ * Map L/R second totals into DB columns. Convention: when both breasts have time, side2 is always
+ * the last-fed breast so `inferLastFedFromFeed` matches after sync (no client-only hint).
+ *
+ * @param {number} lSec
+ * @param {number} rSec
+ * @param {"L" | "R" | null} lastFedExplicit from active / session (null = infer)
+ */
+function canonicalFeedStorageFromTotals(lSec, rSec, lastFedExplicit) {
+  let lastFed = lastFedExplicit;
+  if (lastFed !== "L" && lastFed !== "R") {
+    if (lSec > 0 && rSec <= 0) lastFed = "L";
+    else if (rSec > 0 && lSec <= 0) lastFed = "R";
+    else if (lSec > 0 && rSec > 0) {
+      lastFed = otherSide(sessionFirstSide ?? "L");
+    } else {
+      lastFed = "L";
+    }
+  }
+
+  if (lSec <= 0 && rSec <= 0) {
+    return {
+      side1: /** @type {"L"} */ ("L"),
+      side2: /** @type {null} */ (null),
+      duration1Sec: 0,
+      duration2Sec: /** @type {null} */ (null),
+    };
+  }
+  if (rSec <= 0 && lSec > 0) {
+    return { side1: "L", side2: null, duration1Sec: lSec, duration2Sec: null };
+  }
+  if (lSec <= 0 && rSec > 0) {
+    return { side1: "R", side2: null, duration1Sec: rSec, duration2Sec: null };
+  }
+  const first = otherSide(lastFed);
+  return {
+    side1: first,
+    side2: lastFed,
+    duration1Sec: first === "L" ? lSec : rSec,
+    duration2Sec: lastFed === "L" ? lSec : rSec,
+  };
+}
+
 /** Last breast for this saved row when second-side duration exists; otherwise side1 only. */
 function inferLastFedFromFeed(f) {
   const d2 = f.duration2Sec ?? 0;
@@ -698,10 +738,8 @@ function inferLastFedFromFeed(f) {
   return f.side1;
 }
 
-/** Prefer session-local hint after save/update so Last matches the finished timer. */
+/** Last pill in list: canonical row has side2 = last when both sides have time. */
 function displayLastFedSide(f) {
-  const hint = /** @type {{ _uiLastFedSide?: "L" | "R" }} */ (f)._uiLastFedSide;
-  if (hint === "L" || hint === "R") return hint;
   return inferLastFedFromFeed(f);
 }
 
