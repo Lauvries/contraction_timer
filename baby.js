@@ -691,6 +691,8 @@ function renderFeeds() {
   if (feedsPageLabel) {
     feedsPageLabel.textContent = totalPages <= 1 ? "" : `Page ${feedsPage + 1} / ${totalPages}`;
   }
+  const feedsPaginationEl = feedsPrevPageBtn?.closest(".feed-pagination");
+  if (feedsPaginationEl) feedsPaginationEl.hidden = totalPages <= 1;
   if (feedsPrevPageBtn) feedsPrevPageBtn.disabled = totalPages <= 1 || feedsPage <= 0;
   if (feedsNextPageBtn) feedsNextPageBtn.disabled = totalPages <= 1 || feedsPage >= totalPages - 1;
   if (feedsClearAllBtn) feedsClearAllBtn.hidden = feeds.length === 0;

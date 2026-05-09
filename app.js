@@ -809,6 +809,8 @@ function renderHistory() {
   if (contractionsPageLabel) {
     contractionsPageLabel.textContent = totalPages <= 1 ? "" : `Page ${contractionsPage + 1} / ${totalPages}`;
   }
+  const contractionsPaginationEl = contractionsPrevPageBtn?.closest(".feed-pagination");
+  if (contractionsPaginationEl) contractionsPaginationEl.hidden = totalPages <= 1;
   if (contractionsPrevPageBtn) contractionsPrevPageBtn.disabled = totalPages <= 1 || contractionsPage <= 0;
   if (contractionsNextPageBtn) contractionsNextPageBtn.disabled = totalPages <= 1 || contractionsPage >= totalPages - 1;
 
