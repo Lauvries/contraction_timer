@@ -643,21 +643,64 @@ body.app-loading .main-btn {
   user-select: none;
 }
 
-.history-meta-cluster {
+/* Baby feed history: start time + summary actions on first row, side chips below */
+.feed-row-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
+.feed-meta-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.feed-meta-start {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 140px;
+}
+
+.feed-meta-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.feed-meta-durations {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  flex: 1 1 auto;
 }
 
-.history-meta-actions {
+.feed-meta-durations .history-meta-btn--dur {
+  min-height: 30px;
+}
+
+.feed-meta-actions .feed-total-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  margin-left: auto;
+  min-height: 32px;
+  padding: 0 0.55rem;
+}
+
+.feed-meta-actions .feed-delete-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 1.12rem;
 }
 
 .history-meta-spacer {
