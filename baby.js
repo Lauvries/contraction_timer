@@ -938,10 +938,10 @@ function renderFeeds() {
       top.className = "feed-meta-top";
       const start = document.createElement("div");
       start.className = "feed-meta-start";
-      start.append(timeBtn, sep);
+      start.append(timeBtn, sep, last);
       const actions = document.createElement("div");
       actions.className = "feed-meta-actions";
-      actions.append(last, total, del);
+      actions.append(total, del);
       top.append(start, actions);
 
       const durations = document.createElement("div");
