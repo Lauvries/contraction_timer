@@ -81,11 +81,19 @@
 
       <footer class="app-footer" aria-label="App actions">
         <div class="app-footer-actions">
-          <button type="button" class="header-options-btn" id="reloadBtn" aria-label="Reload app">Reload</button>
-          <button type="button" id="feedsClearAllBtn" class="history-clear-all" hidden aria-label="Clear all feeds">
+          <button
+            type="button"
+            id="feedsClearAllBtn"
+            class="header-options-btn header-options-btn--danger app-footer-clear"
+            hidden
+            aria-label="Clear all feeds"
+          >
             Clear all feeds
           </button>
-          <button type="button" class="header-options-btn" id="signOutBtn" hidden>Sign out</button>
+          <div class="app-footer-trailing">
+            <button type="button" class="header-options-btn" id="reloadBtn" aria-label="Reload app">Reload</button>
+            <button type="button" class="header-options-btn" id="signOutBtn" hidden>Sign out</button>
+          </div>
         </div>
       </footer>
     </div>

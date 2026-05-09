@@ -479,9 +479,36 @@ body.app-loading .main-btn {
 
 .app-footer-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
   gap: 10px;
+  width: 100%;
+}
+
+.app-footer-actions:has(.app-footer-clear:not([hidden])) {
+  justify-content: space-between;
+}
+
+.app-footer-trailing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
+}
+
+.app-footer .header-options-btn {
+  margin-top: 0;
+}
+
+.header-options-btn--danger {
+  border-color: color-mix(in srgb, var(--danger) 48%, transparent);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  color: var(--danger);
+}
+
+.header-options-btn--danger:active {
+  opacity: 0.92;
 }
 
 .history-heading {
@@ -491,28 +518,6 @@ body.app-loading .main-btn {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
-}
-
-.history-clear-all {
-  flex-shrink: 0;
-  padding: 0.35rem 0.65rem;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent);
-  background: transparent;
-  color: var(--danger);
-  font-size: 0.78rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.history-clear-all:active {
-  opacity: 0.9;
-}
-
-.history-clear-all[hidden] {
-  display: none;
 }
 
 .history-list {
