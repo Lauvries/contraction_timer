@@ -571,7 +571,7 @@ body.app-loading .main-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   font-size: 0.875rem;
   line-height: 1.2;
   min-height: 30px;
@@ -641,6 +641,23 @@ body.app-loading .main-btn {
   font-weight: 500;
   flex-shrink: 0;
   user-select: none;
+}
+
+.history-meta-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.history-meta-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .history-meta-spacer {
