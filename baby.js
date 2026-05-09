@@ -43,7 +43,7 @@ let feedsPage = 0;
 let editingFeedTimeId = null;
 /** @type {string | null} */
 let editingFeedDurationId = null;
-/** @type {"side1" | "side2" | null} */
+/** @type {"side1" | "side2" | "side2_add" | null} */
 let editingFeedDurationSide = null;
 
 /** @type {import("@supabase/supabase-js").SupabaseClient | null} */
@@ -52,6 +52,9 @@ let supabase = null;
 let feeds = [];
 /** @type {null | (() => void)} */
 let feedsUnsub = null;
+
+/** @type {string | null} */
+let editingExistingFeedId = null;
 
 /** @type {null | { side: "L" | "R", startedWallMs: number, pausedAtWallMs: number | null, pausedTotalMs: number }} */
 let active = null;
@@ -355,6 +358,7 @@ function persistFeedFlowState() {
     const payload = {
       v: 1,
       savedAtMs: Date.now(),
+      editingExistingFeedId,
       active,
       accumMs,
       sessionStartedAtMs,
@@ -381,6 +385,8 @@ function restoreFeedFlowState() {
     if (!raw) return false;
     const parsed = JSON.parse(raw);
     if (!parsed || parsed.v !== 1) return false;
+
+    editingExistingFeedId = typeof parsed.editingExistingFeedId === "string" ? parsed.editingExistingFeedId : null;
 
     const nextActive = parsed.active;
     const nextAccum = parsed.accumMs;
@@ -483,6 +489,31 @@ function currentSideTotalDurationSec(side) {
   return Math.max(0, Math.round((baseMs + extraMs) / 1000));
 }
 
+function activateFeedForEditing(feed) {
+  if (!feed) return;
+  // If user is in the middle of a different session, confirm switching.
+  const hasInFlight = Boolean(active) || accumMs.L > 0 || accumMs.R > 0;
+  if (hasInFlight && editingExistingFeedId !== feed.id) {
+    if (!confirm("Switch to editing this feed? Your current in-progress timer will be discarded.")) return;
+  }
+
+  if (tick != null) {
+    clearInterval(tick);
+    tick = null;
+  }
+  active = null;
+  accumMs = {
+    L: (feed.side1 === "L" ? feed.duration1Sec : feed.duration2Sec || 0) * 1000,
+    R: (feed.side1 === "R" ? feed.duration1Sec : feed.duration2Sec || 0) * 1000,
+  };
+  sessionStartedAtMs = feed.startedAtMs;
+  sessionFirstSide = feed.side1;
+  lastBeepBucketBySide = { L: 0, R: 0 };
+  editingExistingFeedId = feed.id;
+  renderFeedButtons();
+  persistFeedFlowState();
+}
+
 async function stopActiveAndFinalizeFeed() {
   if (!supabase) {
     setSyncMessage("Not connected to Supabase yet — sign in and refresh.", true);
@@ -520,12 +551,51 @@ async function stopActiveAndFinalizeFeed() {
       return;
     }
 
-    if (duration2Sec > 0) {
-      await insertFeed(supabase, { startedAtMs, side1, duration1Sec, side2, duration2Sec });
-      feedingSummary.textContent = `${side1} ${formatDurationSec(duration1Sec)} + ${side2} ${formatDurationSec(duration2Sec)}`;
+    if (editingExistingFeedId) {
+      // Update existing row instead of inserting a new one.
+      const id = editingExistingFeedId;
+      const target = feeds.find((x) => x.id === id) || null;
+      if (!target) throw new Error("Could not find feed to update.");
+
+      await updateFeed(supabase, id, { startedAtMs, duration1Sec });
+
+      if (duration2Sec > 0) {
+        if (target.side2) {
+          await updateFeed(supabase, id, { duration2Sec });
+        } else {
+          await addSecondSide(supabase, id, { side2, duration2Sec });
+        }
+      } else if (target.side2) {
+        // Keep side2 but allow setting duration to 0 if user effectively removed it.
+        await updateFeed(supabase, id, { duration2Sec: 0 });
+      }
+
+      // Optimistic update (realtime will also reconcile).
+      feeds = feeds.map((f) =>
+        f.id === id
+          ? {
+              ...f,
+              startedAtMs,
+              side1,
+              duration1Sec,
+              side2: duration2Sec > 0 ? side2 : f.side2,
+              duration2Sec: duration2Sec > 0 ? duration2Sec : f.duration2Sec,
+            }
+          : f
+      );
+
+      feedingSummary.textContent =
+        duration2Sec > 0
+          ? `${side1} ${formatDurationSec(duration1Sec)} + ${side2} ${formatDurationSec(duration2Sec)}`
+          : `${side1} ${formatDurationSec(duration1Sec)}`;
     } else {
-      await insertFeed(supabase, { startedAtMs, side1, duration1Sec });
-      feedingSummary.textContent = `${side1} ${formatDurationSec(duration1Sec)}`;
+      if (duration2Sec > 0) {
+        await insertFeed(supabase, { startedAtMs, side1, duration1Sec, side2, duration2Sec });
+        feedingSummary.textContent = `${side1} ${formatDurationSec(duration1Sec)} + ${side2} ${formatDurationSec(duration2Sec)}`;
+      } else {
+        await insertFeed(supabase, { startedAtMs, side1, duration1Sec });
+        feedingSummary.textContent = `${side1} ${formatDurationSec(duration1Sec)}`;
+      }
     }
     setSyncMessage("");
     resetFlow();
@@ -560,12 +630,17 @@ function resetFlow() {
   sessionStartedAtMs = null;
   sessionFirstSide = null;
   lastBeepBucketBySide = { L: 0, R: 0 };
+  editingExistingFeedId = null;
   renderFeedButtons();
   persistFeedFlowState();
 }
 
 function totalDurationSec(feed) {
   return feed.duration1Sec + (feed.duration2Sec || 0);
+}
+
+function otherSide(side) {
+  return side === "L" ? "R" : "L";
 }
 
 function lastFeedEndMs() {
@@ -722,9 +797,22 @@ function renderFeeds() {
       sLab.className = "history-mini-suffix";
       sLab.textContent = "s";
 
-      const curSec = editingFeedDurationSide === "side2" ? (f.duration2Sec || 0) : f.duration1Sec;
+      const curSec =
+        editingFeedDurationSide === "side2"
+          ? (f.duration2Sec || 0)
+          : editingFeedDurationSide === "side2_add"
+            ? 0
+            : f.duration1Sec;
       minIn.value = String(Math.floor(curSec / 60));
       secIn.value = String(curSec % 60);
+
+      const sideHint = document.createElement("span");
+      sideHint.className = "feed-edit-side-hint";
+      if (editingFeedDurationSide === "side2_add") {
+        sideHint.textContent = `Add ${otherSide(f.side1)} duration`;
+      } else {
+        sideHint.textContent = "";
+      }
 
       const ok = document.createElement("button");
       ok.type = "button";
@@ -741,8 +829,17 @@ function renderFeeds() {
         editingFeedDurationSide = null;
         if (!supabase || !sideKey) return;
         try {
-          if (sideKey === "side1") await updateFeed(supabase, f.id, { duration1Sec: parsed });
-          else await updateFeed(supabase, f.id, { duration2Sec: parsed });
+          if (sideKey === "side1") {
+            await updateFeed(supabase, f.id, { duration1Sec: parsed });
+          } else if (sideKey === "side2") {
+            await updateFeed(supabase, f.id, { duration2Sec: parsed });
+          } else if (sideKey === "side2_add") {
+            const side2 = otherSide(f.side1);
+            await addSecondSide(supabase, f.id, { side2, duration2Sec: parsed });
+            // Optimistic update (realtime will also reconcile).
+            const i = feeds.findIndex((x) => x.id === f.id);
+            if (i !== -1) feeds[i] = { ...feeds[i], side2, duration2Sec: parsed };
+          }
           setSyncMessage("");
         } catch (e) {
           console.error(e);
@@ -761,6 +858,7 @@ function renderFeeds() {
 
       mWrap.append(minIn, mLab);
       sWrap.append(secIn, sLab);
+      if (editingFeedDurationSide === "side2_add") edit.append(sideHint);
       edit.append(mWrap, sWrap, ok, cancel);
       rowMeta.appendChild(edit);
     } else {
@@ -797,12 +895,11 @@ function renderFeeds() {
       dur2.type = "button";
       dur2.className = `history-meta-btn history-meta-btn--dur${f.side2 ? "" : " is-placeholder"}`;
       dur2.textContent = f.side2 ? `${f.side2}: ${formatDurationSec(f.duration2Sec || 0)}` : "—";
-      dur2.title = f.side2 ? "Edit duration" : "No second side";
-      dur2.disabled = !f.side2;
+      dur2.title = f.side2 ? "Edit duration" : `Add ${otherSide(f.side1)} duration`;
+      dur2.disabled = false;
       dur2.addEventListener("click", () => {
-        if (!f.side2) return;
         editingFeedDurationId = f.id;
-        editingFeedDurationSide = "side2";
+        editingFeedDurationSide = f.side2 ? "side2" : "side2_add";
         editingFeedTimeId = null;
         renderFeeds();
       });
@@ -813,6 +910,10 @@ function renderFeeds() {
       const total = document.createElement("span");
       total.className = "feed-total-pill";
       total.textContent = totalText;
+
+      const last = document.createElement("span");
+      last.className = "feed-last-pill";
+      last.textContent = `Last: ${f.side2 || f.side1}`;
 
       const del = document.createElement("button");
       del.type = "button";
@@ -834,11 +935,21 @@ function renderFeeds() {
         }
       });
 
-      rowMeta.append(timeBtn, sep, dur1, dur2, spacer, total, del);
+      rowMeta.append(timeBtn, sep, dur1, dur2, spacer, last, total, del);
     }
 
     li.appendChild(rowMeta);
     feedsListEl.appendChild(li);
+
+    // Tapping the row (not buttons) loads it into the timer to continue.
+    if (editingFeedTimeId !== f.id && editingFeedDurationId !== f.id) {
+      li.classList.add("is-addable");
+      li.addEventListener("click", (e) => {
+        const t = /** @type {HTMLElement} */ (e.target);
+        if (t.closest("button")) return;
+        activateFeedForEditing(f);
+      });
+    }
   }
   renderFeedingMetrics();
 }
