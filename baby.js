@@ -904,8 +904,7 @@ function renderFeeds() {
         renderFeeds();
       });
 
-      const spacer = document.createElement("span");
-      spacer.className = "history-meta-spacer";
+      rowMeta.classList.add("feed-row-meta");
 
       const total = document.createElement("span");
       total.className = "feed-total-pill";
@@ -935,7 +934,21 @@ function renderFeeds() {
         }
       });
 
-      rowMeta.append(timeBtn, sep, dur1, dur2, spacer, last, total, del);
+      const top = document.createElement("div");
+      top.className = "feed-meta-top";
+      const start = document.createElement("div");
+      start.className = "feed-meta-start";
+      start.append(timeBtn, sep);
+      const actions = document.createElement("div");
+      actions.className = "feed-meta-actions";
+      actions.append(last, total, del);
+      top.append(start, actions);
+
+      const durations = document.createElement("div");
+      durations.className = "feed-meta-durations";
+      durations.append(dur1, dur2);
+
+      rowMeta.append(top, durations);
     }
 
     li.appendChild(rowMeta);
