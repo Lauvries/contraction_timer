@@ -568,7 +568,7 @@ async function removeContraction(id) {
 }
 
 async function clearAllContractions() {
-  if (!confirm("Remove all logged contractions? This cannot be undone.")) return;
+  if (!confirm("Are you sure you want to remove all logged contractions? This cannot be undone.")) return;
   editingTimeId = null;
   editingDurationId = null;
   if (useCloud()) {

@@ -56,9 +56,6 @@
                 <span class="feed-page-label" id="contractionsPageLabel" aria-live="polite"></span>
                 <button type="button" class="feed-page-btn" id="contractionsNextPage" disabled>Next</button>
               </div>
-              <button type="button" id="clearAllBtn" class="history-clear-all" hidden>
-                Clear all
-              </button>
             </div>
             <ul id="historyList" class="history-list"></ul>
             <p id="historyEmpty" class="history-empty">No contractions logged yet.</p>
@@ -69,6 +66,9 @@
       <footer class="app-footer" aria-label="App actions">
         <div class="app-footer-actions">
           <button type="button" class="header-options-btn" id="reloadBtn" aria-label="Reload app">Reload</button>
+          <button type="button" id="clearAllBtn" class="history-clear-all" hidden aria-label="Clear all contractions">
+            Clear all contractions
+          </button>
           <button type="button" class="header-options-btn" id="signOutBtn" hidden>Sign out</button>
         </div>
       </footer>
