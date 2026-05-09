@@ -1065,7 +1065,7 @@ feedsNextPageBtn?.addEventListener("click", () => {
 
 feedsClearAllBtn?.addEventListener("click", async () => {
   if (!supabase) return;
-  if (!confirm("Delete all feeds? This cannot be undone.")) return;
+  if (!confirm("Are you sure you want to delete all feeds? This cannot be undone.")) return;
   setSyncMessage("Deleting…");
   try {
     await deleteAllFeedsForUser(supabase);
