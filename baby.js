@@ -66,6 +66,8 @@ let sessionStartedAtMs = null;
 let sessionFirstSide = null;
 /** @type {{ L: number, R: number }} */
 let lastBeepBucketBySide = { L: 0, R: 0 };
+/** @type {"L" | "R" | null} */
+let lastFedSideThisSession = null;
 /** @type {number | null} */
 let tick = null;
 /** @type {number | null} */
@@ -234,11 +236,22 @@ function hideLoginIfOpen() {
   if (loginDialog && loginDialog.open) loginDialog.close();
 }
 
+/** Duration for totals (not clock time): "45s", "3m 12s", "1h 4m 2s". */
+function formatDurationSec(sec) {
+  let s = Math.max(0, Math.floor(Number(sec) || 0));
+  const h = Math.floor(s / 3600);
+  s %= 3600;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (r > 0 || parts.length === 0) parts.push(`${r}s`);
+  return parts.join(" ");
+}
+
 function formatElapsed(ms) {
-  const sec = Math.max(0, Math.floor(ms / 1000));
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  return formatDurationSec(Math.max(0, Math.floor(ms / 1000)));
 }
 
 function formatHoursMinutes(ms) {
@@ -246,10 +259,6 @@ function formatHoursMinutes(ms) {
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
   return `${h}:${String(m).padStart(2, "0")}`;
-}
-
-function formatDurationSec(sec) {
-  return formatElapsed(sec * 1000);
 }
 
 function formatTimeOnly(ms) {
@@ -346,6 +355,8 @@ function renderFeedButtons() {
       beep();
     }
   }
+
+  renderFeedingSummary();
 }
 
 function updateTick() {
@@ -363,6 +374,7 @@ function persistFeedFlowState() {
       accumMs,
       sessionStartedAtMs,
       sessionFirstSide,
+      lastFedSideThisSession,
       lastBeepBucketBySide,
     };
     localStorage.setItem(FEED_STATE_KEY, JSON.stringify(payload));
@@ -424,6 +436,9 @@ function restoreFeedFlowState() {
     sessionStartedAtMs = typeof nextStarted === "number" && Number.isFinite(nextStarted) ? nextStarted : null;
     sessionFirstSide = nextFirst === "L" || nextFirst === "R" ? nextFirst : null;
 
+    const nextLastFed = parsed.lastFedSideThisSession;
+    lastFedSideThisSession = nextLastFed === "L" || nextLastFed === "R" ? nextLastFed : null;
+
     if (nextBuckets && typeof nextBuckets === "object") {
       const l = Number(nextBuckets.L);
       const r = Number(nextBuckets.R);
@@ -445,6 +460,7 @@ function startSide(side) {
   tryUnlockAudio();
   if (sessionStartedAtMs == null) sessionStartedAtMs = Date.now();
   if (sessionFirstSide == null) sessionFirstSide = side;
+  lastFedSideThisSession = side;
   active = {
     side,
     startedWallMs: Date.now(),
@@ -472,6 +488,7 @@ function togglePause() {
 
 function pauseRunningSide() {
   if (!active) return;
+  lastFedSideThisSession = active.side;
   const ms = computeActiveRunningMs();
   accumMs[active.side] += ms;
   active = null;
@@ -487,6 +504,34 @@ function currentSideTotalDurationSec(side) {
   const baseMs = accumMs[side];
   const extraMs = active?.side === side ? computeActiveRunningMs() : 0;
   return Math.max(0, Math.round((baseMs + extraMs) / 1000));
+}
+
+/** Live line under the timer while timing or continuing a saved feed; leaves prior text after Stop when idle. */
+function renderFeedingSummary() {
+  if (!feedingSummary) return;
+  const hasSession =
+    Boolean(active) ||
+    accumMs.L > 0 ||
+    accumMs.R > 0 ||
+    editingExistingFeedId != null;
+  if (!hasSession) return;
+
+  const lSec = currentSideTotalDurationSec("L");
+  const rSec = currentSideTotalDurationSec("R");
+  const parts = [];
+  if (lSec > 0) parts.push(`L ${formatDurationSec(lSec)}`);
+  if (rSec > 0) parts.push(`R ${formatDurationSec(rSec)}`);
+  if (parts.length === 0) {
+    feedingSummary.textContent = "";
+    return;
+  }
+
+  const lastLive =
+    active?.side ??
+    lastFedSideThisSession ??
+    (lSec > 0 && rSec <= 0 ? "L" : rSec > 0 && lSec <= 0 ? "R" : sessionFirstSide ? otherSide(sessionFirstSide) : "L");
+
+  feedingSummary.textContent = `${parts.join(" · ")} · Last: ${lastLive}`;
 }
 
 function activateFeedForEditing(feed) {
@@ -509,6 +554,7 @@ function activateFeedForEditing(feed) {
   sessionStartedAtMs = feed.startedAtMs;
   sessionFirstSide = feed.side1;
   lastBeepBucketBySide = { L: 0, R: 0 };
+  lastFedSideThisSession = inferLastFedFromFeed(feed);
   editingExistingFeedId = feed.id;
   renderFeedButtons();
   persistFeedFlowState();
@@ -524,6 +570,8 @@ async function stopActiveAndFinalizeFeed() {
     clearInterval(tick);
     tick = null;
   }
+
+  const lastFedSideAtFinalize = active?.side ?? lastFedSideThisSession ?? null;
 
   // Stop the currently active side (if any) and finalize totals
   if (active) {
@@ -552,7 +600,6 @@ async function stopActiveAndFinalizeFeed() {
     }
 
     if (editingExistingFeedId) {
-      // Update existing row instead of inserting a new one.
       const id = editingExistingFeedId;
       const target = feeds.find((x) => x.id === id) || null;
       if (!target) throw new Error("Could not find feed to update.");
@@ -566,11 +613,11 @@ async function stopActiveAndFinalizeFeed() {
           await addSecondSide(supabase, id, { side2, duration2Sec });
         }
       } else if (target.side2) {
-        // Keep side2 but allow setting duration to 0 if user effectively removed it.
         await updateFeed(supabase, id, { duration2Sec: 0 });
       }
 
-      // Optimistic update (realtime will also reconcile).
+      const lastHint = lastFedSideAtFinalize ?? (duration2Sec > 0 ? side2 : side1);
+
       feeds = feeds.map((f) =>
         f.id === id
           ? {
@@ -578,25 +625,25 @@ async function stopActiveAndFinalizeFeed() {
               startedAtMs,
               side1,
               duration1Sec,
-              side2: duration2Sec > 0 ? side2 : f.side2,
-              duration2Sec: duration2Sec > 0 ? duration2Sec : f.duration2Sec,
+              side2: duration2Sec > 0 ? side2 : null,
+              duration2Sec: duration2Sec > 0 ? duration2Sec : null,
+              _uiLastFedSide: lastHint,
             }
           : f
       );
-
-      feedingSummary.textContent =
-        duration2Sec > 0
-          ? `${side1} ${formatDurationSec(duration1Sec)} + ${side2} ${formatDurationSec(duration2Sec)}`
-          : `${side1} ${formatDurationSec(duration1Sec)}`;
     } else {
       if (duration2Sec > 0) {
         await insertFeed(supabase, { startedAtMs, side1, duration1Sec, side2, duration2Sec });
-        feedingSummary.textContent = `${side1} ${formatDurationSec(duration1Sec)} + ${side2} ${formatDurationSec(duration2Sec)}`;
       } else {
         await insertFeed(supabase, { startedAtMs, side1, duration1Sec });
-        feedingSummary.textContent = `${side1} ${formatDurationSec(duration1Sec)}`;
       }
     }
+
+    const lastLabel = lastFedSideAtFinalize ?? (duration2Sec > 0 ? side2 : side1);
+    if (feedingSummary) {
+      feedingSummary.textContent = formatFeedSummaryLine(side1, duration1Sec, side2, duration2Sec, lastLabel);
+    }
+
     setSyncMessage("");
     resetFlow();
     clearPersistedFeedFlowState();
@@ -630,6 +677,7 @@ function resetFlow() {
   sessionStartedAtMs = null;
   sessionFirstSide = null;
   lastBeepBucketBySide = { L: 0, R: 0 };
+  lastFedSideThisSession = null;
   editingExistingFeedId = null;
   renderFeedButtons();
   persistFeedFlowState();
@@ -641,6 +689,31 @@ function totalDurationSec(feed) {
 
 function otherSide(side) {
   return side === "L" ? "R" : "L";
+}
+
+/** Last breast for this saved row when second-side duration exists; otherwise side1 only. */
+function inferLastFedFromFeed(f) {
+  const d2 = f.duration2Sec ?? 0;
+  if (d2 > 0 && f.side2) return f.side2;
+  return f.side1;
+}
+
+/** Prefer session-local hint after save/update so Last matches the finished timer. */
+function displayLastFedSide(f) {
+  const hint = /** @type {{ _uiLastFedSide?: "L" | "R" }} */ (f)._uiLastFedSide;
+  if (hint === "L" || hint === "R") return hint;
+  return inferLastFedFromFeed(f);
+}
+
+/** One-line summary under the timer: per-breast totals + Last (letters side1/side2 are L/R labels). */
+function formatFeedSummaryLine(side1Letter, d1, side2Letter, d2, lastLetter) {
+  const lSec = side1Letter === "L" ? d1 : d2;
+  const rSec = side1Letter === "R" ? d1 : d2;
+  const parts = [];
+  if (lSec > 0) parts.push(`L ${formatDurationSec(lSec)}`);
+  if (rSec > 0) parts.push(`R ${formatDurationSec(rSec)}`);
+  const basis = parts.join(" · ");
+  return `${basis} · Last: ${lastLetter}`;
 }
 
 function lastFeedEndMs() {
@@ -914,7 +987,7 @@ function renderFeeds() {
 
       const last = document.createElement("span");
       last.className = "feed-last-pill";
-      last.textContent = `Last: ${f.side2 || f.side1}`;
+      last.textContent = `Last: ${displayLastFedSide(f)}`;
 
       const del = document.createElement("button");
       del.type = "button";
