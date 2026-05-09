@@ -163,6 +163,21 @@ export async function deleteFeed(supabase, id) {
 }
 
 /**
+ * Delete all feeds for the currently signed-in user.
+ *
+ * @param {import("@supabase/supabase-js").SupabaseClient} supabase
+ */
+export async function deleteAllFeedsForUser(supabase) {
+  const {
+    data: { user },
+    error: uerr,
+  } = await supabase.auth.getUser();
+  if (uerr || !user) throw uerr || new Error("Not signed in");
+  const { error } = await supabase.from("feeds").delete().eq("user_id", user.id);
+  if (error) throw error;
+}
+
+/**
  * Subscribe to live changes.
  *
  * @param {import("@supabase/supabase-js").SupabaseClient} supabase
@@ -173,42 +188,102 @@ export async function deleteFeed(supabase, id) {
  * @returns {() => void} unsubscribe
  */
 export function subscribeFeedsRealtime(supabase, userId, setList, getList, setStatus) {
-  const chan = supabase
-    .channel(`feeds:${userId}`)
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "feeds", filter: `user_id=eq.${userId}` },
-      (payload) => {
-        const list = getList().slice();
-        const ev = payload.eventType;
-        if (ev === "INSERT" || ev === "UPDATE") {
-          const row = normalizeFeedRow(/** @type {Record<string, unknown>} */ (payload.new));
-          if (!row) return;
-          const i = list.findIndex((x) => x.id === row.id);
-          if (i === -1) list.unshift(row);
-          else list[i] = row;
-        } else if (ev === "DELETE") {
-          const oldRow = /** @type {Record<string, unknown> | undefined} */ (payload.old);
-          const id = oldRow && typeof oldRow.id === "string" ? oldRow.id : null;
-          if (id) {
-            const next = list.filter((x) => x.id !== id);
-            setList(next);
-            return;
-          }
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let retryTimer = null;
+  /** @type {import("@supabase/supabase-js").RealtimeChannel | null} */
+  let chan = null;
+  let closed = false;
+  let attempts = 0;
+
+  function clearRetry() {
+    if (retryTimer != null) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+  }
+
+  function backoffMs(n) {
+    // 0.5s, 1s, 2s, 4s, ... capped, with a bit of jitter
+    const base = Math.min(30_000, 500 * Math.pow(2, Math.max(0, n)));
+    const jitter = Math.floor(Math.random() * 250);
+    return base + jitter;
+  }
+
+  function scheduleRetry(reason) {
+    if (closed) return;
+    clearRetry();
+    attempts += 1;
+    const wait = backoffMs(attempts);
+    console.warn("Realtime: scheduling retry", { reason, attempts, wait });
+    // Only show a warning if we keep failing for a while; transient drops are normal on mobile.
+    if (attempts >= 3) {
+      setStatus("Live sync is reconnecting…", true);
+    }
+    retryTimer = setTimeout(() => {
+      if (closed) return;
+      connect();
+    }, wait);
+  }
+
+  function onPayload(payload) {
+    const list = getList().slice();
+    const ev = payload.eventType;
+    if (ev === "INSERT" || ev === "UPDATE") {
+      const row = normalizeFeedRow(/** @type {Record<string, unknown>} */ (payload.new));
+      if (!row) return;
+      const i = list.findIndex((x) => x.id === row.id);
+      if (i === -1) list.unshift(row);
+      else list[i] = row;
+    } else if (ev === "DELETE") {
+      const oldRow = /** @type {Record<string, unknown> | undefined} */ (payload.old);
+      const id = oldRow && typeof oldRow.id === "string" ? oldRow.id : null;
+      if (id) {
+        const next = list.filter((x) => x.id !== id);
+        setList(next);
+        return;
+      }
+    }
+    list.sort((a, b) => b.startedAtMs - a.startedAtMs);
+    setList(list.slice(0, 100));
+  }
+
+  function connect() {
+    if (closed) return;
+    clearRetry();
+    if (chan) {
+      try {
+        void supabase.removeChannel(chan);
+      } catch {
+        /* ignore */
+      }
+      chan = null;
+    }
+
+    chan = supabase
+      .channel(`feeds:${userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "feeds", filter: `user_id=eq.${userId}` }, onPayload)
+      .subscribe((status, err) => {
+        // Supabase Realtime status values are stringly-typed; handle the common ones we see on mobile.
+        if (status === "SUBSCRIBED") {
+          attempts = 0;
+          setStatus("");
+          return;
         }
-        list.sort((a, b) => b.startedAtMs - a.startedAtMs);
-        setList(list.slice(0, 100));
-      }
-    )
-    .subscribe((status, err) => {
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-        console.warn("Realtime:", status, err);
-        setStatus("Live sync lost connection — refresh if the list looks wrong.", true);
-      }
-    });
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          console.warn("Realtime:", status, err);
+          scheduleRetry(status);
+        }
+      });
+  }
+
+  // Kick off initial connection.
+  connect();
 
   return () => {
-    void supabase.removeChannel(chan);
+    closed = true;
+    clearRetry();
+    if (chan) void supabase.removeChannel(chan);
+    chan = null;
   };
 }
 

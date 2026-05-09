@@ -20,9 +20,6 @@
       <header class="header baby-header">
         <h1 class="title">Baby</h1>
         <p id="syncStatus" class="sync-status" hidden></p>
-        <div class="baby-header-actions">
-          <button type="button" class="header-options-btn" id="signOutBtn" hidden>Sign out</button>
-        </div>
       </header>
 
       <div class="app-layout">
@@ -70,12 +67,27 @@
           <section class="history-section" aria-labelledby="feedsRecentTitle">
             <div class="history-toolbar">
               <h2 id="feedsRecentTitle" class="history-heading">Feeds</h2>
+              <div class="feed-pagination" aria-label="Feed pages">
+                <button type="button" class="feed-page-btn" id="feedsPrevPage" disabled>Prev</button>
+                <span class="feed-page-label" id="feedsPageLabel" aria-live="polite"></span>
+                <button type="button" class="feed-page-btn" id="feedsNextPage" disabled>Next</button>
+              </div>
+              <button type="button" id="feedsClearAllBtn" class="history-clear-all" hidden>
+                Clear all
+              </button>
             </div>
             <ul class="feed-list" id="feedsList"></ul>
             <p class="history-empty" id="feedsEmpty">No feeds logged yet.</p>
           </section>
         </div>
       </div>
+
+      <footer class="app-footer" aria-label="App actions">
+        <div class="app-footer-actions">
+          <button type="button" class="header-options-btn" id="reloadBtn" aria-label="Reload app">Reload</button>
+          <button type="button" class="header-options-btn" id="signOutBtn" hidden>Sign out</button>
+        </div>
+      </footer>
     </div>
 
     <dialog class="options-dialog login-dialog" id="loginDialog" aria-labelledby="loginTitle" aria-modal="true">

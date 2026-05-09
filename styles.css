@@ -416,6 +416,74 @@ body.app-loading .main-btn {
   margin-bottom: 0.75rem;
 }
 
+.feed-pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.feed-page-btn {
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 40%, transparent);
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.feed-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feed-page-label {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 84px;
+  text-align: center;
+}
+
+.feed-day-sep {
+  list-style: none;
+  padding: 0.25rem 0.15rem;
+  margin: 0.2rem 0 0.1rem;
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.feed-day-sep::after {
+  content: "";
+  height: 1px;
+  background: color-mix(in srgb, var(--text-muted) 25%, transparent);
+  flex: 1 1 auto;
+}
+
+.app-footer {
+  margin-top: 1.4rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
+}
+
+.app-footer-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .history-heading {
   margin: 0;
   font-size: 0.85rem;
@@ -832,15 +900,6 @@ body.app-loading .main-btn {
   margin-bottom: 1.1rem;
   position: relative;
   padding-top: 0.2rem;
-}
-
-.baby-header-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0;
-  position: absolute;
-  top: 0;
-  right: 0;
 }
 
 .baby-layout {

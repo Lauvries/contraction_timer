@@ -13,6 +13,9 @@ const targetLine = document.getElementById("targetLine");
 const historyList = document.getElementById("historyList");
 const historyEmpty = document.getElementById("historyEmpty");
 const clearAllBtn = document.getElementById("clearAllBtn");
+const contractionsPrevPageBtn = document.getElementById("contractionsPrevPage");
+const contractionsNextPageBtn = document.getElementById("contractionsNextPage");
+const contractionsPageLabel = document.getElementById("contractionsPageLabel");
 const avgIntervalEl = document.getElementById("avgInterval");
 const avgIntervalHint = document.getElementById("avgIntervalHint");
 const openOptionsBtn = document.getElementById("openOptions");
@@ -31,6 +34,7 @@ const loginPasswordInput = document.getElementById("loginPassword");
 const loginErrorEl = document.getElementById("loginError");
 const loginSubmitBtn = document.getElementById("loginSubmit");
 const signOutBtn = document.getElementById("signOutBtn");
+const reloadBtn = document.getElementById("reloadBtn");
 
 /** @type {string | null} */
 let editingTimeId = null;
@@ -44,6 +48,9 @@ let cloudContractions = [];
 /** @type {import("@supabase/supabase-js").RealtimeChannel | null} */
 let contractionsRealtimeChannel = null;
 let appReady = false;
+
+const CONTRACTIONS_PAGE_SIZE = 20;
+let contractionsPage = 0;
 
 function useCloud() {
   const u = String(window.SUPABASE_URL || "").trim();
@@ -791,9 +798,26 @@ function renderHistory() {
   historyEmpty.hidden = items.length > 0;
   clearAllBtn.hidden = items.length === 0;
 
-  for (let idx = 0; idx < items.length; idx++) {
-    const c = items[idx];
-    const older = items[idx + 1];
+  const total = items.length;
+  const totalPages = total <= 0 ? 0 : Math.ceil(total / CONTRACTIONS_PAGE_SIZE);
+  if (totalPages <= 0) {
+    contractionsPage = 0;
+  } else {
+    contractionsPage = Math.max(0, Math.min(contractionsPage, totalPages - 1));
+  }
+
+  if (contractionsPageLabel) {
+    contractionsPageLabel.textContent = totalPages <= 1 ? "" : `Page ${contractionsPage + 1} / ${totalPages}`;
+  }
+  if (contractionsPrevPageBtn) contractionsPrevPageBtn.disabled = totalPages <= 1 || contractionsPage <= 0;
+  if (contractionsNextPageBtn) contractionsNextPageBtn.disabled = totalPages <= 1 || contractionsPage >= totalPages - 1;
+
+  const start = contractionsPage * CONTRACTIONS_PAGE_SIZE;
+  const pageItems = items.slice(start, start + CONTRACTIONS_PAGE_SIZE);
+
+  for (let idx = 0; idx < pageItems.length; idx++) {
+    const c = pageItems[idx];
+    const older = pageItems[idx + 1];
 
     const li = document.createElement("li");
     li.className = "history-item";
@@ -1014,6 +1038,16 @@ liveTimerToggle.addEventListener("change", () => {
 
 clearAllBtn.addEventListener("click", () => void clearAllContractions());
 
+contractionsPrevPageBtn?.addEventListener("click", () => {
+  contractionsPage = Math.max(0, contractionsPage - 1);
+  renderHistory();
+});
+contractionsNextPageBtn?.addEventListener("click", () => {
+  const totalPages = loadContractions().length <= 0 ? 0 : Math.ceil(loadContractions().length / CONTRACTIONS_PAGE_SIZE);
+  contractionsPage = Math.min(Math.max(0, totalPages - 1), contractionsPage + 1);
+  renderHistory();
+});
+
 openOptionsBtn.addEventListener("click", () => openOptionsForm());
 
 optionsForm.addEventListener("submit", (e) => {
@@ -1042,6 +1076,10 @@ loginDialog?.addEventListener("cancel", (e) => {
 });
 
 signOutBtn?.addEventListener("click", () => void signOutCloud());
+reloadBtn?.addEventListener("click", () => {
+  // iOS home-screen web apps do not expose a reload affordance.
+  window.location.reload();
+});
 
 async function signOutCloud() {
   if (!supabase) return;

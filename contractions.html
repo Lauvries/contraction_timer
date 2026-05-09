@@ -51,6 +51,11 @@
           <section class="history-section" aria-labelledby="history-heading">
             <div class="history-toolbar">
               <h2 id="history-heading" class="history-heading">Recent</h2>
+              <div class="feed-pagination" aria-label="Contraction pages">
+                <button type="button" class="feed-page-btn" id="contractionsPrevPage" disabled>Prev</button>
+                <span class="feed-page-label" id="contractionsPageLabel" aria-live="polite"></span>
+                <button type="button" class="feed-page-btn" id="contractionsNextPage" disabled>Next</button>
+              </div>
               <button type="button" id="clearAllBtn" class="history-clear-all" hidden>
                 Clear all
               </button>
@@ -60,6 +65,13 @@
           </section>
         </div>
       </div>
+
+      <footer class="app-footer" aria-label="App actions">
+        <div class="app-footer-actions">
+          <button type="button" class="header-options-btn" id="reloadBtn" aria-label="Reload app">Reload</button>
+          <button type="button" class="header-options-btn" id="signOutBtn" hidden>Sign out</button>
+        </div>
+      </footer>
     </div>
 
     <dialog class="options-dialog login-dialog" id="loginDialog" aria-labelledby="loginTitle" aria-modal="true">
@@ -154,7 +166,6 @@
           <p class="options-hint">Leave both empty to turn off. Max 59:59 per field.</p>
         </div>
         <div class="options-actions">
-          <button type="button" class="btn-secondary" id="signOutBtn" hidden>Sign out</button>
           <button type="button" class="btn-secondary" id="clearTarget">Clear target</button>
           <button type="submit" class="btn-primary">Done</button>
         </div>

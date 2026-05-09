@@ -1,8 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { addSecondSide, deleteFeed, insertFeed, pullFeeds, subscribeFeedsRealtime, updateFeed } from "./feeds.js";
+import { addSecondSide, deleteAllFeedsForUser, deleteFeed, insertFeed, pullFeeds, subscribeFeedsRealtime, updateFeed } from "./feeds.js";
 
 const syncStatusEl = document.getElementById("syncStatus");
 const signOutBtn = document.getElementById("signOutBtn");
+const reloadBtn = document.getElementById("reloadBtn");
+
+const DEBUG_STATE_KEY = "baby_debug_state_v1";
+const FEED_STATE_KEY = "baby_feed_state_v1";
+const MAX_DEBUG_LOGS = 250;
 
 const loginDialog = document.getElementById("loginDialog");
 const loginForm = document.getElementById("loginForm");
@@ -26,6 +31,13 @@ const feedTimeToHint = document.getElementById("feedTimeToHint");
 
 const feedsListEl = document.getElementById("feedsList");
 const feedsEmptyEl = document.getElementById("feedsEmpty");
+const feedsPrevPageBtn = document.getElementById("feedsPrevPage");
+const feedsNextPageBtn = document.getElementById("feedsNextPage");
+const feedsPageLabel = document.getElementById("feedsPageLabel");
+const feedsClearAllBtn = document.getElementById("feedsClearAllBtn");
+
+const FEEDS_PAGE_SIZE = 20;
+let feedsPage = 0;
 
 /** @type {string | null} */
 let editingFeedTimeId = null;
@@ -41,7 +53,7 @@ let feeds = [];
 /** @type {null | (() => void)} */
 let feedsUnsub = null;
 
-/** @type {null | { side: "L" | "R", startedPerf: number, startedWallMs: number, pausedAtPerf: number | null, pausedTotalMs: number }} */
+/** @type {null | { side: "L" | "R", startedWallMs: number, pausedAtWallMs: number | null, pausedTotalMs: number }} */
 let active = null;
 /** @type {{ L: number, R: number }} */
 let accumMs = { L: 0, R: 0 };
@@ -61,6 +73,87 @@ const FEED_BEEP_EVERY_MS = 5 * 60 * 1000;
 
 /** @type {AudioContext | null} */
 let audioCtx = null;
+
+function isDebugEnabled() {
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("debug") === "1") return true;
+  } catch {
+    /* ignore */
+  }
+  try {
+    const raw = localStorage.getItem(DEBUG_STATE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    return Boolean(parsed?.enabled);
+  } catch {
+    return false;
+  }
+}
+
+function setDebugEnabled(enabled) {
+  try {
+    localStorage.setItem(DEBUG_STATE_KEY, JSON.stringify({ enabled: Boolean(enabled), updatedAtMs: Date.now() }));
+  } catch {
+    /* ignore */
+  }
+}
+
+function pushDebugLog(level, msg, extra) {
+  if (!isDebugEnabled()) return;
+  try {
+    const raw = localStorage.getItem("baby_debug_logs_v1");
+    /** @type {any[]} */
+    const arr = raw ? JSON.parse(raw) : [];
+    arr.push({
+      t: Date.now(),
+      level,
+      msg: String(msg || ""),
+      extra: extra == null ? null : extra,
+      vis: document.visibilityState,
+    });
+    while (arr.length > MAX_DEBUG_LOGS) arr.shift();
+    localStorage.setItem("baby_debug_logs_v1", JSON.stringify(arr));
+  } catch {
+    /* ignore */
+  }
+}
+
+function installDebugHooks() {
+  const origLog = console.log.bind(console);
+  const origWarn = console.warn.bind(console);
+  const origErr = console.error.bind(console);
+  console.log = (...args) => {
+    pushDebugLog("log", args[0], args.slice(1));
+    origLog(...args);
+  };
+  console.warn = (...args) => {
+    pushDebugLog("warn", args[0], args.slice(1));
+    origWarn(...args);
+  };
+  console.error = (...args) => {
+    pushDebugLog("error", args[0], args.slice(1));
+    origErr(...args);
+  };
+
+  window.addEventListener("error", (e) => {
+    pushDebugLog("window.error", e.message || "error", { filename: e.filename, lineno: e.lineno, colno: e.colno });
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    pushDebugLog("unhandledrejection", "promise rejection", String(e.reason || ""));
+  });
+
+  // Allow copying logs from iOS by running: __babyDebugDump()
+  window.__babyDebugDump = () => {
+    try {
+      return localStorage.getItem("baby_debug_logs_v1") || "[]";
+    } catch {
+      return "[]";
+    }
+  };
+  window.__babyDebugOn = () => setDebugEnabled(true);
+  window.__babyDebugOff = () => setDebugEnabled(false);
+}
 
 function getAudioContext() {
   if (audioCtx) return audioCtx;
@@ -198,9 +291,9 @@ function parseMinSec(minStr, secStr) {
 
 function computeActiveRunningMs() {
   if (!active) return 0;
-  const now = performance.now();
-  const end = active.pausedAtPerf == null ? now : active.pausedAtPerf;
-  return Math.max(0, end - active.startedPerf - active.pausedTotalMs);
+  const nowWall = Date.now();
+  const endWall = active.pausedAtWallMs == null ? nowWall : active.pausedAtWallMs;
+  return Math.max(0, endWall - active.startedWallMs - active.pausedTotalMs);
 }
 
 function computeActiveDurationSec() {
@@ -217,15 +310,15 @@ function iconFor(side) {
   const totalMs = sideTotalMs(side);
   if (totalMs <= 0) return "";
   // If this side is active, show the toggle action (pause or resume).
-  if (active?.side === side) return active.pausedAtPerf == null ? "⏸" : "▶";
+  if (active?.side === side) return active.pausedAtWallMs == null ? "⏸" : "▶";
   // If this side has time but isn't active, show that it can be resumed.
   return "▶";
 }
 
 function renderFeedButtons() {
   const activeSide = active?.side ?? null;
-  const running = activeSide !== null && active?.pausedAtPerf == null;
-  const paused = activeSide !== null && active?.pausedAtPerf != null;
+  const running = activeSide !== null && active?.pausedAtWallMs == null;
+  const paused = activeSide !== null && active?.pausedAtWallMs != null;
 
   const lMs = sideTotalMs("L");
   const rMs = sideTotalMs("R");
@@ -257,32 +350,118 @@ function updateTick() {
   renderFeedButtons();
 }
 
+function persistFeedFlowState() {
+  try {
+    const payload = {
+      v: 1,
+      savedAtMs: Date.now(),
+      active,
+      accumMs,
+      sessionStartedAtMs,
+      sessionFirstSide,
+      lastBeepBucketBySide,
+    };
+    localStorage.setItem(FEED_STATE_KEY, JSON.stringify(payload));
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearPersistedFeedFlowState() {
+  try {
+    localStorage.removeItem(FEED_STATE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function restoreFeedFlowState() {
+  try {
+    const raw = localStorage.getItem(FEED_STATE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.v !== 1) return false;
+
+    const nextActive = parsed.active;
+    const nextAccum = parsed.accumMs;
+    const nextStarted = parsed.sessionStartedAtMs;
+    const nextFirst = parsed.sessionFirstSide;
+    const nextBuckets = parsed.lastBeepBucketBySide;
+
+    // Validate minimally; fall back to defaults on bad data.
+    if (
+      nextActive != null &&
+      (nextActive.side !== "L" && nextActive.side !== "R")
+    ) {
+      return false;
+    }
+    if (nextActive != null) {
+      const sw = Number(nextActive.startedWallMs);
+      const pt = Number(nextActive.pausedTotalMs);
+      const paw = nextActive.pausedAtWallMs == null ? null : Number(nextActive.pausedAtWallMs);
+      if (!Number.isFinite(sw) || sw <= 0) return false;
+      if (!Number.isFinite(pt) || pt < 0) return false;
+      if (paw != null && (!Number.isFinite(paw) || paw <= 0)) return false;
+      active = { side: nextActive.side, startedWallMs: sw, pausedAtWallMs: paw, pausedTotalMs: pt };
+    } else {
+      active = null;
+    }
+
+    if (nextAccum && typeof nextAccum === "object") {
+      const l = Number(nextAccum.L);
+      const r = Number(nextAccum.R);
+      accumMs = { L: Number.isFinite(l) && l >= 0 ? l : 0, R: Number.isFinite(r) && r >= 0 ? r : 0 };
+    } else {
+      accumMs = { L: 0, R: 0 };
+    }
+
+    sessionStartedAtMs = typeof nextStarted === "number" && Number.isFinite(nextStarted) ? nextStarted : null;
+    sessionFirstSide = nextFirst === "L" || nextFirst === "R" ? nextFirst : null;
+
+    if (nextBuckets && typeof nextBuckets === "object") {
+      const l = Number(nextBuckets.L);
+      const r = Number(nextBuckets.R);
+      lastBeepBucketBySide = { L: Number.isFinite(l) && l >= 0 ? l : 0, R: Number.isFinite(r) && r >= 0 ? r : 0 };
+    } else {
+      lastBeepBucketBySide = { L: 0, R: 0 };
+    }
+
+    renderFeedButtons();
+    if (active && tick == null) tick = window.setInterval(updateTick, 250);
+    return true;
+  } catch (e) {
+    console.warn("Could not restore feed flow state:", e);
+    return false;
+  }
+}
+
 function startSide(side) {
   tryUnlockAudio();
   if (sessionStartedAtMs == null) sessionStartedAtMs = Date.now();
   if (sessionFirstSide == null) sessionFirstSide = side;
   active = {
     side,
-    startedPerf: performance.now(),
     startedWallMs: Date.now(),
-    pausedAtPerf: null,
+    pausedAtWallMs: null,
     pausedTotalMs: 0,
   };
   if (tick != null) clearInterval(tick);
   tick = window.setInterval(updateTick, 250);
   renderFeedButtons();
+  persistFeedFlowState();
 }
 
 function togglePause() {
   if (!active) return;
   tryUnlockAudio();
-  if (active.pausedAtPerf == null) {
-    active.pausedAtPerf = performance.now();
+  if (active.pausedAtWallMs == null) {
+    active.pausedAtWallMs = Date.now();
   } else {
-    active.pausedTotalMs += Math.max(0, performance.now() - active.pausedAtPerf);
-    active.pausedAtPerf = null;
+    active.pausedTotalMs += Math.max(0, Date.now() - active.pausedAtWallMs);
+    active.pausedAtWallMs = null;
   }
   renderFeedButtons();
+  persistFeedFlowState();
 }
 
 function pauseRunningSide() {
@@ -295,6 +474,7 @@ function pauseRunningSide() {
     tick = null;
   }
   renderFeedButtons();
+  persistFeedFlowState();
 }
 
 function currentSideTotalDurationSec(side) {
@@ -320,6 +500,7 @@ async function stopActiveAndFinalizeFeed() {
     active = null;
   }
   renderFeedButtons();
+  persistFeedFlowState();
 
   const lSec = Math.round(accumMs.L / 1000);
   const rSec = Math.round(accumMs.R / 1000);
@@ -348,6 +529,7 @@ async function stopActiveAndFinalizeFeed() {
     }
     setSyncMessage("");
     resetFlow();
+    clearPersistedFeedFlowState();
   } catch (e) {
     console.error(e);
     setSyncMessage("Could not save feed.", true);
@@ -379,6 +561,7 @@ function resetFlow() {
   sessionFirstSide = null;
   lastBeepBucketBySide = { L: 0, R: 0 };
   renderFeedButtons();
+  persistFeedFlowState();
 }
 
 function totalDurationSec(feed) {
@@ -422,7 +605,44 @@ function renderFeeds() {
   feedsListEl.innerHTML = "";
   feedsEmptyEl.hidden = feeds.length > 0;
 
-  for (const f of feeds) {
+  const total = feeds.length;
+  const totalPages = total <= 0 ? 0 : Math.ceil(total / FEEDS_PAGE_SIZE);
+  if (totalPages <= 0) {
+    feedsPage = 0;
+  } else {
+    feedsPage = Math.max(0, Math.min(feedsPage, totalPages - 1));
+  }
+
+  if (feedsPageLabel) {
+    feedsPageLabel.textContent = totalPages <= 1 ? "" : `Page ${feedsPage + 1} / ${totalPages}`;
+  }
+  if (feedsPrevPageBtn) feedsPrevPageBtn.disabled = totalPages <= 1 || feedsPage <= 0;
+  if (feedsNextPageBtn) feedsNextPageBtn.disabled = totalPages <= 1 || feedsPage >= totalPages - 1;
+  if (feedsClearAllBtn) feedsClearAllBtn.hidden = feeds.length === 0;
+
+  const start = feedsPage * FEEDS_PAGE_SIZE;
+  const pageFeeds = feeds.slice(start, start + FEEDS_PAGE_SIZE);
+
+  let lastDayKey = null;
+  for (const f of pageFeeds) {
+    const dayKey = (() => {
+      const d = new Date(f.startedAtMs);
+      const yyyy = String(d.getFullYear());
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    })();
+
+    if (dayKey !== lastDayKey) {
+      lastDayKey = dayKey;
+      const d = new Date(f.startedAtMs);
+      const weekday = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(d);
+      const sep = document.createElement("li");
+      sep.className = "feed-day-sep";
+      sep.textContent = `${weekday} · ${dayKey}`;
+      feedsListEl.appendChild(sep);
+    }
+
     const li = document.createElement("li");
     li.className = "history-item";
 
@@ -709,18 +929,72 @@ feedRightBtn.addEventListener("click", () => {
 });
 feedStopMidBtn?.addEventListener("click", () => void stopActiveAndFinalizeFeed());
 
+feedsPrevPageBtn?.addEventListener("click", () => {
+  feedsPage = Math.max(0, feedsPage - 1);
+  renderFeeds();
+});
+feedsNextPageBtn?.addEventListener("click", () => {
+  const totalPages = feeds.length <= 0 ? 0 : Math.ceil(feeds.length / FEEDS_PAGE_SIZE);
+  feedsPage = Math.min(Math.max(0, totalPages - 1), feedsPage + 1);
+  renderFeeds();
+});
+
+feedsClearAllBtn?.addEventListener("click", async () => {
+  if (!supabase) return;
+  if (!confirm("Delete all feeds? This cannot be undone.")) return;
+  setSyncMessage("Deleting…");
+  try {
+    await deleteAllFeedsForUser(supabase);
+    feeds = [];
+    feedsPage = 0;
+    renderFeeds();
+    setSyncMessage("");
+  } catch (e) {
+    console.error(e);
+    setSyncMessage("Could not delete all feeds.", true);
+  }
+});
+
 loginForm?.addEventListener("submit", (e) => {
   e.preventDefault();
   void signInWithPassword();
 });
 loginDialog?.addEventListener("cancel", (e) => e.preventDefault());
 signOutBtn?.addEventListener("click", () => void signOut());
+reloadBtn?.addEventListener("click", () => {
+  try {
+    pushDebugLog("ui", "reload button clicked");
+  } catch {
+    /* ignore */
+  }
+  // In iOS home-screen web apps there is no browser chrome; provide an explicit reload.
+  window.location.reload();
+});
 
 // Smoke indicator that baby.js booted and handlers attached.
 setSyncMessage("");
 
 async function bootstrap() {
-  resetFlow();
+  installDebugHooks();
+  // Prefer restoring an in-progress timer across reloads/backgrounding.
+  const restored = restoreFeedFlowState();
+  if (!restored) resetFlow();
+
+  // Keep state fresh when iOS background/foregrounds this PWA.
+  const onVisibilityOrFocus = () => {
+    persistFeedFlowState();
+    if (document.visibilityState === "visible") {
+      // Timers may have been suspended; re-arm tick and re-render.
+      if (active && tick == null) tick = window.setInterval(updateTick, 250);
+      renderFeedButtons();
+      renderFeedingMetrics();
+    }
+  };
+  document.addEventListener("visibilitychange", onVisibilityOrFocus);
+  window.addEventListener("focus", onVisibilityOrFocus);
+  window.addEventListener("pageshow", onVisibilityOrFocus);
+  window.addEventListener("pagehide", () => persistFeedFlowState());
+
   if (!useCloud()) {
     setSyncMessage("Cloud is not configured (supabase-config.js).", true);
     return;
