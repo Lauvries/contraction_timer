@@ -716,13 +716,6 @@ function durationEditKeyForBreast(f, side) {
   return "side2_add";
 }
 
-function lastFeedEndMs() {
-  if (feeds.length === 0) return null;
-  const f = feeds[0];
-  return f.startedAtMs + totalDurationSec(f) * 1000;
-}
-
-/** Start time of the most recent feed (used for "next feed at" target window). */
 function lastFeedStartMs() {
   if (feeds.length === 0) return null;
   return feeds[0].startedAtMs;
@@ -731,8 +724,7 @@ function lastFeedStartMs() {
 function renderFeedingMetrics() {
   if (!feedTimeSinceEl || !feedTimeToEl) return;
   const startMs = lastFeedStartMs();
-  const endMs = lastFeedEndMs();
-  if (startMs == null || endMs == null) {
+  if (startMs == null) {
     feedTimeSinceEl.textContent = "—";
     feedTimeToEl.textContent = "—";
     feedTimeToEl.classList.remove("feeding-metric-value--overdue");
@@ -740,7 +732,7 @@ function renderFeedingMetrics() {
     return;
   }
 
-  const sinceMs = Math.max(0, Date.now() - endMs);
+  const sinceMs = Math.max(0, Date.now() - startMs);
   feedTimeSinceEl.textContent = formatElapsed(sinceMs);
 
   const dueMs = startMs + FEED_TARGET_INTERVAL_MS;
