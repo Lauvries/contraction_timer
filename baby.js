@@ -716,16 +716,15 @@ function durationEditKeyForBreast(f, side) {
   return "side2_add";
 }
 
-function lastFeedEndMs() {
+function lastFeedStartMs() {
   if (feeds.length === 0) return null;
-  const f = feeds[0];
-  return f.startedAtMs + totalDurationSec(f) * 1000;
+  return feeds[0].startedAtMs;
 }
 
 function renderFeedingMetrics() {
   if (!feedTimeSinceEl || !feedTimeToEl) return;
-  const endMs = lastFeedEndMs();
-  if (endMs == null) {
+  const startMs = lastFeedStartMs();
+  if (startMs == null) {
     feedTimeSinceEl.textContent = "—";
     feedTimeToEl.textContent = "—";
     feedTimeToEl.classList.remove("feeding-metric-value--overdue");
@@ -733,10 +732,10 @@ function renderFeedingMetrics() {
     return;
   }
 
-  const sinceMs = Math.max(0, Date.now() - endMs);
+  const sinceMs = Math.max(0, Date.now() - startMs);
   feedTimeSinceEl.textContent = formatElapsed(sinceMs);
 
-  const dueMs = endMs + FEED_TARGET_INTERVAL_MS;
+  const dueMs = startMs + FEED_TARGET_INTERVAL_MS;
   feedTimeToEl.textContent = formatTimeOnly(dueMs);
 
   const remainingMs = dueMs - Date.now();
@@ -1057,6 +1056,7 @@ async function signOut() {
   }
   await supabase.auth.signOut();
   feeds = [];
+  if (feedingSummary) feedingSummary.textContent = "";
   renderFeeds();
   signOutBtn.hidden = true;
   setSyncMessage("Sign in to sync your logs.");
