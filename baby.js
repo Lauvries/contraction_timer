@@ -722,10 +722,17 @@ function lastFeedEndMs() {
   return f.startedAtMs + totalDurationSec(f) * 1000;
 }
 
+/** Start time of the most recent feed (used for "next feed at" target window). */
+function lastFeedStartMs() {
+  if (feeds.length === 0) return null;
+  return feeds[0].startedAtMs;
+}
+
 function renderFeedingMetrics() {
   if (!feedTimeSinceEl || !feedTimeToEl) return;
+  const startMs = lastFeedStartMs();
   const endMs = lastFeedEndMs();
-  if (endMs == null) {
+  if (startMs == null || endMs == null) {
     feedTimeSinceEl.textContent = "—";
     feedTimeToEl.textContent = "—";
     feedTimeToEl.classList.remove("feeding-metric-value--overdue");
@@ -736,7 +743,7 @@ function renderFeedingMetrics() {
   const sinceMs = Math.max(0, Date.now() - endMs);
   feedTimeSinceEl.textContent = formatElapsed(sinceMs);
 
-  const dueMs = endMs + FEED_TARGET_INTERVAL_MS;
+  const dueMs = startMs + FEED_TARGET_INTERVAL_MS;
   feedTimeToEl.textContent = formatTimeOnly(dueMs);
 
   const remainingMs = dueMs - Date.now();
@@ -1057,6 +1064,7 @@ async function signOut() {
   }
   await supabase.auth.signOut();
   feeds = [];
+  if (feedingSummary) feedingSummary.textContent = "";
   renderFeeds();
   signOutBtn.hidden = true;
   setSyncMessage("Sign in to sync your logs.");
