@@ -802,141 +802,11 @@ function renderFeeds() {
     const totalSec = totalDurationSec(f);
     const totalText = `Total ${formatDurationSec(totalSec)}`;
 
-    if (editingFeedTimeId === f.id) {
-      rowMeta.classList.add("history-item-row--edit");
-      const wrap = document.createElement("div");
-      wrap.className = "history-meta-edit";
-      const input = document.createElement("input");
-      input.type = "time";
-      input.step = "1";
-      input.className = "history-time-input";
-      input.value = toTimeInputValue(f.startedAtMs);
-      const apply = document.createElement("button");
-      apply.type = "button";
-      apply.className = "history-pill-btn history-pill-btn--primary";
-      apply.textContent = "OK";
-      apply.addEventListener("click", async () => {
-        editingFeedTimeId = null;
-        if (!supabase) return;
-        const startedAtMs = applyTimeStringToStartedAtMs(f.startedAtMs, input.value);
-        try {
-          await updateFeed(supabase, f.id, { startedAtMs });
-          setSyncMessage("");
-        } catch (e) {
-          console.error(e);
-          setSyncMessage("Could not update time.", true);
-        }
-      });
-      const cancel = document.createElement("button");
-      cancel.type = "button";
-      cancel.className = "history-pill-btn";
-      cancel.textContent = "Cancel";
-      cancel.addEventListener("click", () => {
-        editingFeedTimeId = null;
-        renderFeeds();
-      });
-      wrap.append(input, apply, cancel);
-      rowMeta.appendChild(wrap);
-    } else if (editingFeedDurationId === f.id) {
-      rowMeta.classList.add("history-item-row--edit");
-      const edit = document.createElement("div");
-      edit.className = "history-duration-edit-inline";
+    const isEditingTime = editingFeedTimeId === f.id;
+    const isEditingDuration = editingFeedDurationId === f.id;
+    li.classList.toggle("is-editing", isEditingTime || isEditingDuration);
 
-      const mWrap = document.createElement("div");
-      mWrap.className = "history-mini-wrap";
-      const minIn = document.createElement("input");
-      minIn.type = "number";
-      minIn.inputMode = "numeric";
-      minIn.min = "0";
-      minIn.max = "999";
-      minIn.step = "1";
-      minIn.className = "history-mini-input";
-      minIn.placeholder = "m";
-      minIn.setAttribute("aria-label", "Minutes");
-      const mLab = document.createElement("span");
-      mLab.className = "history-mini-suffix";
-      mLab.textContent = "m";
-
-      const sWrap = document.createElement("div");
-      sWrap.className = "history-mini-wrap";
-      const secIn = document.createElement("input");
-      secIn.type = "number";
-      secIn.inputMode = "numeric";
-      secIn.min = "0";
-      secIn.max = "59";
-      secIn.step = "1";
-      secIn.className = "history-mini-input";
-      secIn.placeholder = "s";
-      secIn.setAttribute("aria-label", "Seconds");
-      const sLab = document.createElement("span");
-      sLab.className = "history-mini-suffix";
-      sLab.textContent = "s";
-
-      const curSec =
-        editingFeedDurationSide === "side2"
-          ? (f.duration2Sec || 0)
-          : editingFeedDurationSide === "side2_add"
-            ? 0
-            : f.duration1Sec;
-      minIn.value = String(Math.floor(curSec / 60));
-      secIn.value = String(curSec % 60);
-
-      const sideHint = document.createElement("span");
-      sideHint.className = "feed-edit-side-hint";
-      if (editingFeedDurationSide === "side2_add") {
-        sideHint.textContent = `Add ${otherSide(f.side1)} duration`;
-      } else {
-        sideHint.textContent = "";
-      }
-
-      const ok = document.createElement("button");
-      ok.type = "button";
-      ok.className = "history-pill-btn history-pill-btn--primary";
-      ok.textContent = "OK";
-      ok.addEventListener("click", async () => {
-        const parsed = parseMinSec(minIn.value, secIn.value);
-        if (parsed == null) {
-          setSyncMessage("Enter minutes/seconds.", true);
-          return;
-        }
-        editingFeedDurationId = null;
-        const sideKey = editingFeedDurationSide;
-        editingFeedDurationSide = null;
-        if (!supabase || !sideKey) return;
-        try {
-          if (sideKey === "side1") {
-            await updateFeed(supabase, f.id, { duration1Sec: parsed });
-          } else if (sideKey === "side2") {
-            await updateFeed(supabase, f.id, { duration2Sec: parsed });
-          } else if (sideKey === "side2_add") {
-            const side2 = otherSide(f.side1);
-            await addSecondSide(supabase, f.id, { side2, duration2Sec: parsed });
-            // Optimistic update (realtime will also reconcile).
-            const i = feeds.findIndex((x) => x.id === f.id);
-            if (i !== -1) feeds[i] = { ...feeds[i], side2, duration2Sec: parsed };
-          }
-          setSyncMessage("");
-        } catch (e) {
-          console.error(e);
-          setSyncMessage("Could not update duration.", true);
-        }
-      });
-      const cancel = document.createElement("button");
-      cancel.type = "button";
-      cancel.className = "history-pill-btn";
-      cancel.textContent = "Cancel";
-      cancel.addEventListener("click", () => {
-        editingFeedDurationId = null;
-        editingFeedDurationSide = null;
-        renderFeeds();
-      });
-
-      mWrap.append(minIn, mLab);
-      sWrap.append(secIn, sLab);
-      if (editingFeedDurationSide === "side2_add") edit.append(sideHint);
-      edit.append(mWrap, sWrap, ok, cancel);
-      rowMeta.appendChild(edit);
-    } else {
+    if (!isEditingTime && !isEditingDuration) {
       const timeBtn = document.createElement("button");
       timeBtn.type = "button";
       timeBtn.className = "history-meta-btn history-meta-btn--time";
@@ -1021,6 +891,224 @@ function renderFeeds() {
       const bottom = document.createElement("div");
       bottom.className = "feed-meta-bottom";
       bottom.append(timeBtn, spacer, total, del);
+
+      rowMeta.append(durations, bottom);
+    } else {
+      rowMeta.classList.add("feed-row-meta");
+      rowMeta.classList.add("history-item-row--edit");
+
+      const createTimeEditor = () => {
+        const wrap = document.createElement("div");
+        wrap.className = "history-meta-edit";
+        const input = document.createElement("input");
+        input.type = "time";
+        input.step = "1";
+        input.className = "history-time-input";
+        input.value = toTimeInputValue(f.startedAtMs);
+        const apply = document.createElement("button");
+        apply.type = "button";
+        apply.className = "history-pill-btn history-pill-btn--primary";
+        apply.textContent = "OK";
+        apply.addEventListener("click", async () => {
+          editingFeedTimeId = null;
+          if (!supabase) return;
+          const startedAtMs = applyTimeStringToStartedAtMs(f.startedAtMs, input.value);
+          try {
+            await updateFeed(supabase, f.id, { startedAtMs });
+            setSyncMessage("");
+          } catch (e) {
+            console.error(e);
+            setSyncMessage("Could not update time.", true);
+          }
+        });
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "history-pill-btn";
+        cancel.textContent = "Cancel";
+        cancel.addEventListener("click", () => {
+          editingFeedTimeId = null;
+          renderFeeds();
+        });
+        wrap.append(input, apply, cancel);
+        return wrap;
+      };
+
+      const createDurationEditor = () => {
+        const edit = document.createElement("div");
+        edit.className = "history-duration-edit-inline";
+
+        const mWrap = document.createElement("div");
+        mWrap.className = "history-mini-wrap";
+        const minIn = document.createElement("input");
+        minIn.type = "number";
+        minIn.inputMode = "numeric";
+        minIn.min = "0";
+        minIn.max = "999";
+        minIn.step = "1";
+        minIn.className = "history-mini-input";
+        minIn.placeholder = "m";
+        minIn.setAttribute("aria-label", "Minutes");
+        const mLab = document.createElement("span");
+        mLab.className = "history-mini-suffix";
+        mLab.textContent = "m";
+
+        const sWrap = document.createElement("div");
+        sWrap.className = "history-mini-wrap";
+        const secIn = document.createElement("input");
+        secIn.type = "number";
+        secIn.inputMode = "numeric";
+        secIn.min = "0";
+        secIn.max = "59";
+        secIn.step = "1";
+        secIn.className = "history-mini-input";
+        secIn.placeholder = "s";
+        secIn.setAttribute("aria-label", "Seconds");
+        const sLab = document.createElement("span");
+        sLab.className = "history-mini-suffix";
+        sLab.textContent = "s";
+
+        const curSec =
+          editingFeedDurationSide === "side2"
+            ? (f.duration2Sec || 0)
+            : editingFeedDurationSide === "side2_add"
+              ? 0
+              : f.duration1Sec;
+        minIn.value = String(Math.floor(curSec / 60));
+        secIn.value = String(curSec % 60);
+
+        const sideHint = document.createElement("span");
+        sideHint.className = "feed-edit-side-hint";
+        if (editingFeedDurationSide === "side2_add") {
+          sideHint.textContent = `Add ${otherSide(f.side1)} duration`;
+        } else {
+          sideHint.textContent = "";
+        }
+
+        const ok = document.createElement("button");
+        ok.type = "button";
+        ok.className = "history-pill-btn history-pill-btn--primary";
+        ok.textContent = "OK";
+        ok.addEventListener("click", async () => {
+          const parsed = parseMinSec(minIn.value, secIn.value);
+          if (parsed == null) {
+            setSyncMessage("Enter minutes/seconds.", true);
+            return;
+          }
+          editingFeedDurationId = null;
+          const sideKey = editingFeedDurationSide;
+          editingFeedDurationSide = null;
+          if (!supabase || !sideKey) return;
+          try {
+            if (sideKey === "side1") {
+              await updateFeed(supabase, f.id, { duration1Sec: parsed });
+            } else if (sideKey === "side2") {
+              await updateFeed(supabase, f.id, { duration2Sec: parsed });
+            } else if (sideKey === "side2_add") {
+              const side2 = otherSide(f.side1);
+              await addSecondSide(supabase, f.id, { side2, duration2Sec: parsed });
+              // Optimistic update (realtime will also reconcile).
+              const i = feeds.findIndex((x) => x.id === f.id);
+              if (i !== -1) feeds[i] = { ...feeds[i], side2, duration2Sec: parsed };
+            }
+            setSyncMessage("");
+          } catch (e) {
+            console.error(e);
+            setSyncMessage("Could not update duration.", true);
+          }
+        });
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "history-pill-btn";
+        cancel.textContent = "Cancel";
+        cancel.addEventListener("click", () => {
+          editingFeedDurationId = null;
+          editingFeedDurationSide = null;
+          renderFeeds();
+        });
+
+        mWrap.append(minIn, mLab);
+        sWrap.append(secIn, sLab);
+        if (editingFeedDurationSide === "side2_add") edit.append(sideHint);
+        edit.append(mWrap, sWrap, ok, cancel);
+        return edit;
+      };
+
+      const lDurSec = durationSecForBreast(f, "L");
+      const rDurSec = durationSecForBreast(f, "R");
+      const lastFedRow = inferLastFedFromFeed(f);
+
+      const makeDurBtn = (side, sec, lastFed) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--${side}${sec <= 0 ? " is-placeholder" : ""}${
+          lastFed === side ? " is-last-fed" : ""
+        }`;
+        btn.textContent = sec > 0 ? `${side}: ${formatDurationSec(sec)}` : "—";
+        btn.title = sec > 0 ? `Edit ${side} duration` : `Add ${side} duration`;
+        btn.addEventListener("click", () => {
+          editingFeedDurationId = f.id;
+          editingFeedDurationSide = durationEditKeyForBreast(f, side);
+          editingFeedTimeId = null;
+          renderFeeds();
+        });
+        return btn;
+      };
+
+      const durations = document.createElement("div");
+      durations.className = "feed-meta-durations";
+      if (isEditingDuration) {
+        durations.appendChild(createDurationEditor());
+        durations.classList.add("feed-meta-durations--editing");
+      } else {
+        durations.append(makeDurBtn("L", lDurSec, lastFedRow), makeDurBtn("R", rDurSec, lastFedRow));
+      }
+
+      const total = document.createElement("span");
+      total.className = "feed-total-pill";
+      total.textContent = totalText;
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "history-icon-btn history-delete-btn";
+      del.textContent = "×";
+      del.setAttribute("aria-label", "Remove feed");
+      del.addEventListener("click", async () => {
+        if (!supabase) return;
+        if (!confirm("Delete this feed?")) return;
+        setSyncMessage("Deleting…");
+        try {
+          await deleteFeed(supabase, f.id);
+          feeds = feeds.filter((x) => x.id !== f.id);
+          renderFeeds();
+          setSyncMessage("");
+        } catch (e) {
+          console.error(e);
+          setSyncMessage("Could not delete feed.", true);
+        }
+      });
+
+      const spacer = document.createElement("span");
+      spacer.className = "history-meta-spacer";
+
+      const bottom = document.createElement("div");
+      bottom.className = "feed-meta-bottom";
+      if (isEditingTime) {
+        bottom.appendChild(createTimeEditor());
+        bottom.classList.add("feed-meta-bottom--editing");
+      } else {
+        const timeBtn = document.createElement("button");
+        timeBtn.type = "button";
+        timeBtn.className = "history-meta-btn history-meta-btn--time";
+        timeBtn.textContent = formatTimeOnly(f.startedAtMs);
+        timeBtn.setAttribute("aria-label", "Edit time");
+        timeBtn.addEventListener("click", () => {
+          editingFeedTimeId = f.id;
+          editingFeedDurationId = null;
+          editingFeedDurationSide = null;
+          renderFeeds();
+        });
+        bottom.append(timeBtn, spacer, total, del);
+      }
 
       rowMeta.append(durations, bottom);
     }

@@ -598,6 +598,11 @@ body.app-loading .main-btn {
   min-width: 0;
 }
 
+.history-item.is-editing {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
 .history-item-row--intensity {
   display: flex;
   flex-wrap: nowrap;
@@ -726,6 +731,10 @@ body.app-loading .main-btn {
   border-bottom: 1px solid color-mix(in srgb, var(--text-muted) 14%, transparent);
 }
 
+.feed-meta-durations--editing {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .feed-meta-durations .history-meta-btn--dur {
   min-height: 32px;
   box-sizing: border-box;
@@ -741,6 +750,10 @@ body.app-loading .main-btn {
   gap: 8px;
   min-width: 0;
   padding-top: 6px;
+}
+
+.feed-meta-bottom--editing {
+  justify-content: flex-start;
 }
 
 .history-meta-btn--dur.is-last-fed {
