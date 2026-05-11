@@ -3,14 +3,26 @@ name: Manual add/commit/push
 on:
   workflow_dispatch:
     inputs:
-      commit_message:
-        description: Commit message
+      commit_mode:
+        description: Use AI to generate commit message (ai) or provide one (manual)
         required: true
-        default: "chore: automated update"
+        default: "ai"
+        type: choice
+        options:
+          - ai
+          - manual
+      commit_message:
+        description: Commit message (only used when commit_mode=manual)
+        required: false
+        default: ""
       add_path:
         description: Pathspec to add (e.g. '.' or 'styles.css')
         required: true
         default: "."
+      ai_model:
+        description: OpenAI model (only used when commit_mode=ai)
+        required: true
+        default: "gpt-4.1-mini"
 
 permissions:
   contents: write
@@ -32,13 +44,70 @@ jobs:
         run: |
           git add -- "${{ inputs.add_path }}"
 
+      - name: Create commit message
+        id: msg
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if git diff --staged --quiet; then
+            echo "No staged changes; skipping commit."
+            exit 0
+          fi
+
+          if [ "${{ inputs.commit_mode }}" = "manual" ]; then
+            if [ -z "${{ inputs.commit_message }}" ]; then
+              echo "commit_message is required when commit_mode=manual" >&2
+              exit 1
+            fi
+            printf "%s\n" "${{ inputs.commit_message }}" > COMMIT_MSG.txt
+            echo "message_path=COMMIT_MSG.txt" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "Missing secrets.OPENAI_API_KEY (required for commit_mode=ai)" >&2
+            exit 1
+          fi
+
+          # Keep prompt small enough for Actions logs and API limits.
+          git diff --staged --patch --stat=200 --minimal > DIFF.txt
+
+          cat > PROMPT.txt <<'EOF'
+          You are generating a git commit message.
+          Requirements:
+          - Return ONLY the commit message (no code fences, no quotes).
+          - First line: <= 72 chars, imperative mood.
+          - Optional blank line + short body (wrap ~72 chars) describing why.
+          EOF
+          printf "\nStaged diff:\n\n" >> PROMPT.txt
+          cat DIFF.txt >> PROMPT.txt
+
+          # Use OpenAI Responses API; jq is available on ubuntu-latest.
+          curl -sS https://api.openai.com/v1/responses \
+            -H "Authorization: Bearer ${OPENAI_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg model "${{ inputs.ai_model }}" --rawfile prompt PROMPT.txt '{
+              model: $model,
+              input: $prompt
+            }')" > RESPONSE.json
+
+          MSG="$(jq -r '.output_text // empty' RESPONSE.json | sed -e 's/[[:space:]]\+$//' )"
+          if [ -z "$MSG" ] || [ "$MSG" = "null" ]; then
+            echo "AI did not return a commit message." >&2
+            cat RESPONSE.json >&2 || true
+            exit 1
+          fi
+
+          printf "%s\n" "$MSG" > COMMIT_MSG.txt
+          echo "message_path=COMMIT_MSG.txt" >> "$GITHUB_OUTPUT"
+
       - name: Commit (if needed)
         run: |
           if git diff --staged --quiet; then
             echo "No staged changes; skipping commit."
             exit 0
           fi
-          git commit -m "${{ inputs.commit_message }}"
+          git commit -F "${{ steps.msg.outputs.message_path }}"
 
       - name: Push
         run: |
