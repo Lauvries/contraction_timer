@@ -29,7 +29,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp index.html contractions.html contractions_page.js feeds_page.js feeds.js styles.css supabase-config.js _site/
+          cp index.html contractions.html contractions_page.js feeds_page.js feeds.js auth.js pull_to_refresh.js styles.css supabase-config.js _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
