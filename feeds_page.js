@@ -1,9 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { addSecondSide, deleteAllFeedsForUser, deleteFeed, insertFeed, pullFeeds, subscribeFeedsRealtime, updateFeed } from "./feeds.js";
+import { installPullToRefresh } from "./pull_to_refresh.js";
+import { waitForInitialSession } from "./auth.js";
 
 const syncStatusEl = document.getElementById("syncStatus");
 const signOutBtn = document.getElementById("signOutBtn");
-const reloadBtn = document.getElementById("reloadBtn");
 
 const DEBUG_STATE_KEY = "baby_debug_state_v1";
 const FEED_STATE_KEY = "baby_feed_state_v1";
@@ -948,11 +949,6 @@ function renderFeeds() {
         renderFeeds();
       });
 
-      const sep = document.createElement("span");
-      sep.className = "history-meta-sep";
-      sep.textContent = "·";
-      sep.setAttribute("aria-hidden", "true");
-
       const lDurSec = durationSecForBreast(f, "L");
       const rDurSec = durationSecForBreast(f, "R");
       const lastFedRow = inferLastFedFromFeed(f);
@@ -993,9 +989,10 @@ function renderFeeds() {
 
       const del = document.createElement("button");
       del.type = "button";
-      del.className = "feed-delete-btn";
+      // Keep delete consistent with contractions list styling.
+      del.className = "history-icon-btn history-delete-btn";
       del.textContent = "×";
-      del.setAttribute("aria-label", "Delete feed");
+      del.setAttribute("aria-label", "Remove feed");
       del.addEventListener("click", async () => {
         if (!supabase) return;
         if (!confirm("Delete this feed?")) return;
@@ -1011,21 +1008,21 @@ function renderFeeds() {
         }
       });
 
-      const top = document.createElement("div");
-      top.className = "feed-meta-top";
-      const start = document.createElement("div");
-      start.className = "feed-meta-start";
-      start.append(timeBtn, sep);
-      const actions = document.createElement("div");
-      actions.className = "feed-meta-actions";
-      actions.append(total, del);
-      top.append(start, actions);
-
       const durations = document.createElement("div");
       durations.className = "feed-meta-durations";
       durations.append(durL, durR);
 
-      rowMeta.append(top, durations);
+      // Match contractions-style layout:
+      // - top: L/R durations
+      // - bottom: time + total + remove (all in one div)
+      const spacer = document.createElement("span");
+      spacer.className = "history-meta-spacer";
+
+      const bottom = document.createElement("div");
+      bottom.className = "feed-meta-bottom";
+      bottom.append(timeBtn, spacer, total, del);
+
+      rowMeta.append(durations, bottom);
     }
 
     li.appendChild(rowMeta);
@@ -1163,20 +1160,12 @@ loginForm?.addEventListener("submit", (e) => {
 });
 loginDialog?.addEventListener("cancel", (e) => e.preventDefault());
 signOutBtn?.addEventListener("click", () => void signOut());
-reloadBtn?.addEventListener("click", () => {
-  try {
-    pushDebugLog("ui", "reload button clicked");
-  } catch {
-    /* ignore */
-  }
-  // In iOS home-screen web apps there is no browser chrome; provide an explicit reload.
-  window.location.reload();
-});
 
-// Smoke indicator that baby.js booted and handlers attached.
+// Smoke indicator that feeds_page.js booted and handlers attached.
 setSyncMessage("");
 
 async function bootstrap() {
+  installPullToRefresh();
   installDebugHooks();
   // Prefer restoring an in-progress timer across reloads/backgrounding.
   const restored = restoreFeedFlowState();
@@ -1218,9 +1207,7 @@ async function bootstrap() {
     }
   });
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const session = await waitForInitialSession(supabase);
   if (session?.user) {
     await onSignedIn();
   } else {

@@ -12,13 +12,12 @@
   <body>
     <div class="app">
       <nav class="top-nav" aria-label="Primary">
-        <a class="top-nav-link is-active" href="./index.html" aria-current="page">Baby</a>
+        <a class="top-nav-link is-active" href="./index.html" aria-current="page">Feeds</a>
         <span class="top-nav-sep" aria-hidden="true">·</span>
         <a class="top-nav-link" href="./contractions.html">Contractions</a>
       </nav>
 
       <header class="header baby-header">
-        <h1 class="title">Baby</h1>
         <p id="syncStatus" class="sync-status" hidden></p>
       </header>
 
@@ -46,8 +45,8 @@
                 </span>
               </button>
 
-              <button type="button" class="feeding-stop-mid" id="feedStopMid" aria-label="Stop current breast" disabled>
-                Stop
+              <button type="button" class="feeding-stop-mid" id="feedStopMid" aria-label="End current breast" disabled>
+                End
               </button>
 
               <button type="button" class="main-btn feeding-main-btn feeding-main-btn--right" id="feedRight">
@@ -89,7 +88,6 @@
             Clear all feeds
           </button>
           <div class="app-footer-trailing">
-            <button type="button" class="header-options-btn" id="reloadBtn" aria-label="Reload app">Reload</button>
             <button type="button" class="header-options-btn" id="signOutBtn" hidden>Sign out</button>
           </div>
         </div>
@@ -136,6 +134,6 @@
     </dialog>
 
     <script src="supabase-config.js"></script>
-    <script type="module" src="baby.js"></script>
+    <script type="module" src="feeds_page.js"></script>
   </body>
 </html>
