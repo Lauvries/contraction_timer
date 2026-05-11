@@ -977,12 +977,14 @@ function renderFeeds() {
         secIn.value = String(curSec % 60);
 
         const sideHint = document.createElement("span");
-        sideHint.className = "feed-edit-side-hint";
-        if (editingFeedDurationSide === "side2_add") {
-          sideHint.textContent = `Add ${otherSide(f.side1)} duration`;
-        } else {
-          sideHint.textContent = "";
-        }
+        sideHint.className = "feed-edit-side-hint feed-edit-side-hint--active";
+        const editingSide =
+          editingFeedDurationSide === "side2_add"
+            ? otherSide(f.side1)
+            : editingFeedDurationSide === "side2"
+              ? (f.side2 ?? otherSide(f.side1))
+              : f.side1;
+        sideHint.textContent = editingSide;
 
         const ok = document.createElement("button");
         ok.type = "button";
@@ -1028,8 +1030,7 @@ function renderFeeds() {
 
         mWrap.append(minIn, mLab);
         sWrap.append(secIn, sLab);
-        if (editingFeedDurationSide === "side2_add") edit.append(sideHint);
-        edit.append(mWrap, sWrap, ok, cancel);
+        edit.append(sideHint, mWrap, sWrap, ok, cancel);
         return edit;
       };
 
