@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { installPullToRefresh } from "./pull_to_refresh.js";
+import { waitForInitialSession } from "./auth.js";
 
 const STORAGE_KEY = "contraction-timer-v1";
 const LAST_INTENSITY_KEY = "lastIntensity";
@@ -34,7 +36,6 @@ const loginPasswordInput = document.getElementById("loginPassword");
 const loginErrorEl = document.getElementById("loginError");
 const loginSubmitBtn = document.getElementById("loginSubmit");
 const signOutBtn = document.getElementById("signOutBtn");
-const reloadBtn = document.getElementById("reloadBtn");
 
 /** @type {string | null} */
 let editingTimeId = null;
@@ -504,7 +505,7 @@ function abortLiveSession() {
 
 function syncMainButtonLabel() {
   if (loadLiveTimer()) {
-    mainBtnLabel.textContent = activeSession ? "Stop tracking" : "Start tracking";
+    mainBtnLabel.textContent = activeSession ? "End tracking" : "Start tracking";
   } else {
     mainBtnLabel.textContent = "Log contraction";
   }
@@ -513,7 +514,7 @@ function syncMainButtonLabel() {
 function syncTimerModeHint() {
   if (loadLiveTimer()) {
     timerModeHint.textContent =
-      "Main button runs Start / Stop tracking and records duration automatically.";
+      "Main button runs Start / End tracking and records duration automatically.";
   } else {
     timerModeHint.textContent = "Main button adds a list row at the current time; edit details in Recent.";
   }
@@ -1078,10 +1079,6 @@ loginDialog?.addEventListener("cancel", (e) => {
 });
 
 signOutBtn?.addEventListener("click", () => void signOutCloud());
-reloadBtn?.addEventListener("click", () => {
-  // iOS home-screen web apps do not expose a reload affordance.
-  window.location.reload();
-});
 
 async function signOutCloud() {
   if (!supabase) return;
@@ -1099,6 +1096,7 @@ async function signOutCloud() {
 async function bootstrap() {
   document.body.classList.add("app-loading");
   setSyncMessage("");
+  installPullToRefresh();
   try {
     if (useCloud()) {
       setSyncMessage("Loading your data…");
@@ -1109,6 +1107,7 @@ async function bootstrap() {
           detectSessionInUrl: true,
         },
       });
+
       supabase.auth.onAuthStateChange((event) => {
         if (!useCloud()) return;
         if (event === "SIGNED_OUT") {
@@ -1125,9 +1124,7 @@ async function bootstrap() {
           }
         }
       });
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await waitForInitialSession(supabase);
       if (session) {
         await pullCloudContractions();
         await migrateLocalToCloudIfNeeded();
