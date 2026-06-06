@@ -362,9 +362,13 @@ async function bootstrap() {
   installPullToRefresh();
   updateDateLabel();
 
-  // Re-render when the scroll container is resized (orientation change, browser chrome, etc.)
+  // Re-render when the scroll container is resized (orientation change, browser chrome, etc.).
+  // Skip if currentFeeds is empty — that means data hasn't loaded yet; renderTimeline
+  // will be called with real data once loadDay finishes.
   if (typeof ResizeObserver !== "undefined" && timelineScroll) {
-    new ResizeObserver(() => renderTimeline(currentFeeds, [])).observe(timelineScroll);
+    new ResizeObserver(() => {
+      if (currentFeeds.length > 0) renderTimeline(currentFeeds, []);
+    }).observe(timelineScroll);
   }
 
   if (!useCloud()) {

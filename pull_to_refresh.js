@@ -27,15 +27,18 @@ export function installPullToRefresh() {
   let armed = false;
   let animating = false;
 
-  function isAtTop() {
+  function isAtTop(touchTarget) {
     // In standalone mode, window.scrollY can be quirky; allow a tiny epsilon.
     if (window.scrollY > 1) return false;
-    // If the user is actively scrolling a nested scroll container (history pane),
-    // don't steal the gesture unless that container is also at the top.
-    const active = document.activeElement;
-    if (active instanceof HTMLElement) {
-      const scroller = active.closest(".app-panel--history");
-      if (scroller instanceof HTMLElement && scroller.scrollTop > 0) return false;
+    // Walk up from the touched element. If any scrollable ancestor is scrolled
+    // down, the user is not at the top — don't steal the gesture.
+    let el = touchTarget instanceof Element ? touchTarget : null;
+    while (el && el !== document.documentElement) {
+      if (el instanceof HTMLElement) {
+        const ov = getComputedStyle(el).overflowY;
+        if ((ov === "auto" || ov === "scroll") && el.scrollTop > 0) return false;
+      }
+      el = el.parentElement;
     }
     return true;
   }
@@ -71,7 +74,7 @@ export function installPullToRefresh() {
     "touchstart",
     (e) => {
       if (e.touches.length !== 1) return;
-      if (!isAtTop()) return;
+      if (!isAtTop(e.target)) return;
       const t = e.touches[0];
       startY = t.clientY;
       pulling = true;
@@ -86,7 +89,7 @@ export function installPullToRefresh() {
     (e) => {
       if (!pulling) return;
       if (e.touches.length !== 1) return;
-      if (!isAtTop()) {
+      if (!isAtTop(e.target)) {
         pulling = false;
         snapBack();
         return;
