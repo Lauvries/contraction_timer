@@ -1435,11 +1435,24 @@ body.app-loading .main-btn {
   /* Handled via body/html height in the timeline layout below. */
 }
 
-html:has(.timeline-scroll) body,
+html:has(.timeline-scroll) {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+html:has(.timeline-scroll) body {
+  height: 100dvh;
+  min-height: unset;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 html:has(.timeline-scroll) .app {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 html:has(.timeline-scroll) .timeline-scroll {

@@ -30,8 +30,10 @@ const loginSubmitBtn = document.getElementById("loginSubmit");
 const TIMELINE_SCALE = 3;
 
 function getPxPerMin() {
-  const h = timelineScroll ? timelineScroll.clientHeight : window.innerHeight;
-  return Math.max(0.5, (h * TIMELINE_SCALE) / (24 * 60));
+  const h = (timelineScroll && timelineScroll.clientHeight > 0)
+    ? timelineScroll.clientHeight
+    : window.innerHeight;
+  return (h * TIMELINE_SCALE) / (24 * 60);
 }
 
 function getTimelineHeight() {
