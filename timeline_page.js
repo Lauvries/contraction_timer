@@ -23,13 +23,17 @@ const loginErrorEl = document.getElementById("loginError");
 const loginSubmitBtn = document.getElementById("loginSubmit");
 
 // ---------------------------------------------------------------------------
-// Config
+// Scale — derived from the scroll container height so 24h = one screen
 // ---------------------------------------------------------------------------
 
-/** Pixels per minute of the day. Adjust to taste. */
-const PX_PER_MIN = 4;
-/** Total timeline height for 24 hours. */
-const TIMELINE_HEIGHT_PX = 24 * 60 * PX_PER_MIN;
+function getPxPerMin() {
+  const h = timelineScroll ? timelineScroll.clientHeight : window.innerHeight;
+  return Math.max(0.05, h / (24 * 60));
+}
+
+function getTimelineHeight() {
+  return Math.round(getPxPerMin() * 24 * 60);
+}
 
 // ---------------------------------------------------------------------------
 // State
@@ -40,6 +44,9 @@ let supabase = null;
 
 /** Current displayed date (local midnight). @type {Date} */
 let currentDate = todayMidnight();
+
+/** Last loaded feeds, kept for re-render on resize. @type {import("./feeds.js").FeedRow[]} */
+let currentFeeds = [];
 
 // ---------------------------------------------------------------------------
 // Date helpers
@@ -143,8 +150,11 @@ function formatDurationSec(sec) {
  */
 function renderTimeline(feeds, _sleeps) {
   if (!timelineInner) return;
+  const pxPerMin = getPxPerMin();
+  const totalH = getTimelineHeight();
+
   timelineInner.innerHTML = "";
-  timelineInner.style.height = `${TIMELINE_HEIGHT_PX}px`;
+  timelineInner.style.height = `${totalH}px`;
 
   const leftCol = document.createElement("div");
   leftCol.className = "tl-left";
@@ -162,7 +172,7 @@ function renderTimeline(feeds, _sleeps) {
 
   // Hour marks + labels on spine
   for (let h = 0; h < 24; h++) {
-    const topPx = h * 60 * PX_PER_MIN;
+    const topPx = Math.round(h * 60 * pxPerMin);
     const mark = document.createElement("div");
     mark.className = "tl-hour-mark";
     mark.style.top = `${topPx}px`;
@@ -175,7 +185,7 @@ function renderTimeline(feeds, _sleeps) {
 
   // Current-time indicator (today only)
   if (dayStartMs(currentDate) === dayStartMs(todayMidnight())) {
-    const nowPx = Math.round(minutesSinceMidnight(Date.now()) * PX_PER_MIN);
+    const nowPx = Math.round(minutesSinceMidnight(Date.now()) * pxPerMin);
 
     const nowDot = document.createElement("div");
     nowDot.className = "tl-dot tl-dot--now";
@@ -195,18 +205,16 @@ function renderTimeline(feeds, _sleeps) {
 
   // Feed events — left column
   for (const feed of feeds) {
-    const topPx = Math.round(minutesSinceMidnight(feed.startedAtMs) * PX_PER_MIN);
+    const topPx = Math.round(minutesSinceMidnight(feed.startedAtMs) * pxPerMin);
     const totalSec = feed.duration1Sec + (feed.duration2Sec ?? 0);
-    const durationPx = Math.max(0, Math.round((totalSec / 60) * PX_PER_MIN));
+    const durationPx = Math.max(0, Math.round((totalSec / 60) * pxPerMin));
     const sides = [feed.side1, feed.side2].filter(Boolean).join("+");
 
-    // Dot on center spine
     const dot = document.createElement("div");
     dot.className = "tl-dot tl-dot--feed";
     dot.style.top = `${topPx}px`;
     centerCol.appendChild(dot);
 
-    // Event element in left column
     const el = document.createElement("div");
     el.className = "tl-event--feed";
     el.style.top = `${topPx}px`;
@@ -256,19 +264,8 @@ function updateDateLabel() {
 }
 
 function scrollToNowOrFirstEvent(feeds) {
-  if (!timelineScroll) return;
-  const isToday = dayStartMs(currentDate) === dayStartMs(todayMidnight());
-  if (isToday) {
-    const nowMin = minutesSinceMidnight(Date.now());
-    const targetPx = Math.max(0, nowMin * PX_PER_MIN - timelineScroll.clientHeight / 2);
-    timelineScroll.scrollTop = targetPx;
-  } else if (feeds.length > 0) {
-    const firstMin = minutesSinceMidnight(feeds[0].startedAtMs);
-    const targetPx = Math.max(0, firstMin * PX_PER_MIN - 60);
-    timelineScroll.scrollTop = targetPx;
-  } else {
-    timelineScroll.scrollTop = 0;
-  }
+  // Timeline height = screen height, so no scrolling needed.
+  if (timelineScroll) timelineScroll.scrollTop = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -280,7 +277,7 @@ async function loadDay(date, scrollToNow) {
   setSyncMessage("Loading…");
   try {
     const feeds = await pullFeedsForDay(supabase, dayStartMs(date), dayEndMs(date));
-    // Future: const sleeps = await pullSleepsForDay(supabase, dayStartMs(date), dayEndMs(date));
+    currentFeeds = feeds;
     renderTimeline(feeds, []);
     if (scrollToNow) scrollToNowOrFirstEvent(feeds);
     setSyncMessage("");
@@ -349,6 +346,11 @@ loginDialog?.addEventListener("cancel", (e) => e.preventDefault());
 async function bootstrap() {
   installPullToRefresh();
   updateDateLabel();
+
+  // Re-render when the scroll container is resized (orientation change, browser chrome, etc.)
+  if (typeof ResizeObserver !== "undefined" && timelineScroll) {
+    new ResizeObserver(() => renderTimeline(currentFeeds, [])).observe(timelineScroll);
+  }
 
   if (!useCloud()) {
     setSyncMessage("Cloud is not configured (supabase-config.js).", true);
