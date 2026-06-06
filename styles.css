@@ -7,6 +7,7 @@
   --accent-dim: #b86d8c;
   --success: #7dcea0;
   --danger: #e8786e;
+  --border: color-mix(in srgb, var(--text-muted) 28%, transparent);
   --radius: 20px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
