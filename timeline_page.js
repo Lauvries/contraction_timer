@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { pullFeedsForDay } from "./feeds.js";
+import { pullFeedsForDay, insertFeed } from "./feeds.js";
 import { installPullToRefresh } from "./pull_to_refresh.js";
 import { waitForInitialSession } from "./auth.js";
 
@@ -14,6 +14,12 @@ const timelineTodayBtn = document.getElementById("timelineToday");
 const timelineDateLabel = document.getElementById("timelineDateLabel");
 const timelineScroll = document.getElementById("timelineScroll");
 const timelineInner = document.getElementById("timelineInner");
+
+const fabRoot = document.getElementById("tlFabRoot");
+const fabMain = document.getElementById("tlFabMain");
+const fabOptions = document.getElementById("tlFabOptions");
+const fabLeft = document.getElementById("tlFabLeft");
+const fabRight = document.getElementById("tlFabRight");
 
 const loginDialog = document.getElementById("loginDialog");
 const loginForm = document.getElementById("loginForm");
@@ -353,6 +359,54 @@ loginForm?.addEventListener("submit", (e) => {
   void signInWithPassword();
 });
 loginDialog?.addEventListener("cancel", (e) => e.preventDefault());
+
+// ---------------------------------------------------------------------------
+// FAB — quick-log feed from timeline
+// ---------------------------------------------------------------------------
+
+let fabOpen = false;
+
+function setFabOpen(open) {
+  fabOpen = open;
+  fabMain?.classList.toggle("is-open", open);
+  fabOptions?.classList.toggle("is-open", open);
+  fabMain?.setAttribute("aria-expanded", String(open));
+  fabOptions?.setAttribute("aria-hidden", String(!open));
+}
+
+fabMain?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  setFabOpen(!fabOpen);
+});
+
+document.addEventListener("click", (e) => {
+  if (fabOpen && fabRoot && !fabRoot.contains(/** @type {Node} */ (e.target))) {
+    setFabOpen(false);
+  }
+});
+
+async function quickLog(side) {
+  setFabOpen(false);
+  if (!supabase) return;
+  setSyncMessage("Logging…");
+  try {
+    const feed = await insertFeed(supabase, {
+      startedAtMs: Date.now(),
+      side1: side,
+      duration1Sec: 0,
+      quickLog: true,
+    });
+    currentFeeds = [...currentFeeds, feed].sort((a, b) => a.startedAtMs - b.startedAtMs);
+    renderTimeline(currentFeeds, []);
+    setSyncMessage("");
+  } catch (e) {
+    console.error(e);
+    setSyncMessage("Could not log feed.", true);
+  }
+}
+
+fabLeft?.addEventListener("click", () => void quickLog("L"));
+fabRight?.addEventListener("click", () => void quickLog("R"));
 
 // ---------------------------------------------------------------------------
 // Bootstrap

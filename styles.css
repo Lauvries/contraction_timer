@@ -1734,3 +1734,100 @@ html:has(.timeline-scroll) .timeline-scroll {
   background: #14b8a6;
   box-shadow: 0 0 0 2px var(--bg);
 }
+
+/* ---- Add-feed FAB ---- */
+.tl-fab-root {
+  position: fixed;
+  right: 20px;
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 200;
+}
+
+.tl-fab-main {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 4px 18px rgb(0 0 0 / 45%),
+    0 1px 4px rgb(0 0 0 / 25%);
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tl-fab-main:active {
+  transform: scale(0.93);
+}
+
+.tl-fab-main.is-open {
+  background: var(--accent-dim);
+  box-shadow:
+    0 6px 24px rgb(0 0 0 / 50%),
+    0 1px 4px rgb(0 0 0 / 25%);
+}
+
+.tl-fab-icon {
+  font-size: 1.75rem;
+  font-weight: 300;
+  line-height: 1;
+  display: block;
+  transition: transform 0.22s ease;
+  margin-top: -1px;
+}
+
+.tl-fab-main.is-open .tl-fab-icon {
+  transform: rotate(45deg);
+}
+
+.tl-fab-options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(10px) scale(0.88);
+  transition: opacity 0.18s ease, transform 0.2s ease;
+}
+
+.tl-fab-options.is-open {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.tl-fab-side-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 12px rgb(0 0 0 / 40%);
+  transition: transform 0.12s ease, background 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tl-fab-side-btn:active {
+  transform: scale(0.9);
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+}
