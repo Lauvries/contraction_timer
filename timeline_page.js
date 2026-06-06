@@ -23,12 +23,15 @@ const loginErrorEl = document.getElementById("loginError");
 const loginSubmitBtn = document.getElementById("loginSubmit");
 
 // ---------------------------------------------------------------------------
-// Scale — derived from the scroll container height so 24h = one screen
+// Scale — timeline is TIMELINE_SCALE × screen height so it's scrollable
+// but proportional to the device. 1 hour ≈ screen_height / 8.
 // ---------------------------------------------------------------------------
+
+const TIMELINE_SCALE = 3;
 
 function getPxPerMin() {
   const h = timelineScroll ? timelineScroll.clientHeight : window.innerHeight;
-  return Math.max(0.05, h / (24 * 60));
+  return Math.max(0.5, (h * TIMELINE_SCALE) / (24 * 60));
 }
 
 function getTimelineHeight() {
@@ -264,8 +267,18 @@ function updateDateLabel() {
 }
 
 function scrollToNowOrFirstEvent(feeds) {
-  // Timeline height = screen height, so no scrolling needed.
-  if (timelineScroll) timelineScroll.scrollTop = 0;
+  if (!timelineScroll) return;
+  const pxPerMin = getPxPerMin();
+  const isToday = dayStartMs(currentDate) === dayStartMs(todayMidnight());
+  if (isToday) {
+    const nowPx = minutesSinceMidnight(Date.now()) * pxPerMin;
+    timelineScroll.scrollTop = Math.max(0, nowPx - timelineScroll.clientHeight / 2);
+  } else if (feeds.length > 0) {
+    const firstPx = minutesSinceMidnight(feeds[0].startedAtMs) * pxPerMin;
+    timelineScroll.scrollTop = Math.max(0, firstPx - timelineScroll.clientHeight / 4);
+  } else {
+    timelineScroll.scrollTop = 0;
+  }
 }
 
 // ---------------------------------------------------------------------------
