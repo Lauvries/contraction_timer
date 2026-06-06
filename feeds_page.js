@@ -368,6 +368,7 @@ function renderFeedButtons() {
     feedRightBtn.classList.toggle("feeding-last-fed", lastFedSide === "R");
 
     if (feedStopMidBtn) feedStopMidBtn.hidden = true;
+    feedLeftBtn.closest(".feeding-triplet")?.classList.add("feeding-triplet--quick");
     return;
   }
 
@@ -376,6 +377,7 @@ function renderFeedButtons() {
   const paused = activeSide !== null && active?.pausedAtWallMs != null;
 
   if (feedStopMidBtn) feedStopMidBtn.hidden = false;
+  feedLeftBtn.closest(".feeding-triplet")?.classList.remove("feeding-triplet--quick");
 
   const lMs = sideTotalMs("L");
   const rMs = sideTotalMs("R");
@@ -939,92 +941,110 @@ function renderFeeds() {
     li.classList.toggle("is-editing", isEditingTime || isEditingDuration);
 
     if (!isEditingTime && !isEditingDuration) {
-      const timeBtn = document.createElement("button");
-      timeBtn.type = "button";
-      timeBtn.className = "history-meta-btn history-meta-btn--time";
-      timeBtn.textContent = formatTimeOnly(f.startedAtMs);
-      timeBtn.setAttribute("aria-label", "Edit time");
-      timeBtn.addEventListener("click", () => {
-        editingFeedTimeId = f.id;
-        editingFeedDurationId = null;
-        editingFeedDurationSide = null;
-        renderFeeds();
-      });
-
-      const lDurSec = durationSecForBreast(f, "L");
-      const rDurSec = durationSecForBreast(f, "R");
-      const lastFedRow = inferLastFedFromFeed(f);
-
-      const durL = document.createElement("button");
-      durL.type = "button";
-      durL.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--L${lDurSec <= 0 ? " is-placeholder" : ""}${
-        lastFedRow === "L" ? " is-last-fed" : ""
-      }`;
-      durL.textContent = lDurSec > 0 ? `L: ${formatDurationSec(lDurSec)}` : "—";
-      durL.title = lDurSec > 0 ? "Edit L duration" : "Add L duration";
-      durL.addEventListener("click", () => {
-        editingFeedDurationId = f.id;
-        editingFeedDurationSide = durationEditKeyForBreast(f, "L");
-        editingFeedTimeId = null;
-        renderFeeds();
-      });
-
-      const durR = document.createElement("button");
-      durR.type = "button";
-      durR.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--R${rDurSec <= 0 ? " is-placeholder" : ""}${
-        lastFedRow === "R" ? " is-last-fed" : ""
-      }`;
-      durR.textContent = rDurSec > 0 ? `R: ${formatDurationSec(rDurSec)}` : "—";
-      durR.title = rDurSec > 0 ? "Edit R duration" : "Add R duration";
-      durR.addEventListener("click", () => {
-        editingFeedDurationId = f.id;
-        editingFeedDurationSide = durationEditKeyForBreast(f, "R");
-        editingFeedTimeId = null;
-        renderFeeds();
-      });
-
+      const quickLog = loadQuickLog();
       rowMeta.classList.add("feed-row-meta");
 
-      const total = document.createElement("span");
-      total.className = "feed-total-pill";
-      total.textContent = totalText;
+      const makeDel = () => {
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "history-icon-btn history-delete-btn";
+        del.textContent = "×";
+        del.setAttribute("aria-label", "Remove feed");
+        del.addEventListener("click", async () => {
+          if (!supabase) return;
+          if (!confirm("Delete this feed?")) return;
+          setSyncMessage("Deleting…");
+          try {
+            await deleteFeed(supabase, f.id);
+            feeds = feeds.filter((x) => x.id !== f.id);
+            renderFeeds();
+            setSyncMessage("");
+          } catch (e) {
+            console.error(e);
+            setSyncMessage("Could not delete feed.", true);
+          }
+        });
+        return del;
+      };
 
-      const del = document.createElement("button");
-      del.type = "button";
-      // Keep delete consistent with contractions list styling.
-      del.className = "history-icon-btn history-delete-btn";
-      del.textContent = "×";
-      del.setAttribute("aria-label", "Remove feed");
-      del.addEventListener("click", async () => {
-        if (!supabase) return;
-        if (!confirm("Delete this feed?")) return;
-        setSyncMessage("Deleting…");
-        try {
-          await deleteFeed(supabase, f.id);
-          feeds = feeds.filter((x) => x.id !== f.id);
+      if (quickLog) {
+        // Quick-log mode: one compact row — time + side(s) + delete.
+        const timeSpan = document.createElement("span");
+        timeSpan.className = "history-meta-btn history-meta-btn--time feed-ql-time";
+        timeSpan.textContent = formatTimeOnly(f.startedAtMs);
+
+        const sides = [f.side1, f.side2].filter(Boolean);
+        const sidesSpan = document.createElement("span");
+        sidesSpan.className = "feed-ql-sides";
+        sidesSpan.textContent = sides.join(" + ");
+
+        const spacer = document.createElement("span");
+        spacer.className = "history-meta-spacer";
+
+        rowMeta.classList.add("feed-row-meta--quick");
+        rowMeta.append(timeSpan, sidesSpan, spacer, makeDel());
+      } else {
+        const timeBtn = document.createElement("button");
+        timeBtn.type = "button";
+        timeBtn.className = "history-meta-btn history-meta-btn--time";
+        timeBtn.textContent = formatTimeOnly(f.startedAtMs);
+        timeBtn.setAttribute("aria-label", "Edit time");
+        timeBtn.addEventListener("click", () => {
+          editingFeedTimeId = f.id;
+          editingFeedDurationId = null;
+          editingFeedDurationSide = null;
           renderFeeds();
-          setSyncMessage("");
-        } catch (e) {
-          console.error(e);
-          setSyncMessage("Could not delete feed.", true);
-        }
-      });
+        });
 
-      const durations = document.createElement("div");
-      durations.className = "feed-meta-durations";
-      durations.append(durL, durR);
+        const lDurSec = durationSecForBreast(f, "L");
+        const rDurSec = durationSecForBreast(f, "R");
+        const lastFedRow = inferLastFedFromFeed(f);
 
-      // Match contractions-style layout:
-      // - top: L/R durations
-      // - bottom: time + total + remove (all in one div)
-      const spacer = document.createElement("span");
-      spacer.className = "history-meta-spacer";
+        const durL = document.createElement("button");
+        durL.type = "button";
+        durL.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--L${lDurSec <= 0 ? " is-placeholder" : ""}${
+          lastFedRow === "L" ? " is-last-fed" : ""
+        }`;
+        durL.textContent = lDurSec > 0 ? `L: ${formatDurationSec(lDurSec)}` : "—";
+        durL.title = lDurSec > 0 ? "Edit L duration" : "Add L duration";
+        durL.addEventListener("click", () => {
+          editingFeedDurationId = f.id;
+          editingFeedDurationSide = durationEditKeyForBreast(f, "L");
+          editingFeedTimeId = null;
+          renderFeeds();
+        });
 
-      const bottom = document.createElement("div");
-      bottom.className = "feed-meta-bottom";
-      bottom.append(timeBtn, spacer, total, del);
+        const durR = document.createElement("button");
+        durR.type = "button";
+        durR.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--R${rDurSec <= 0 ? " is-placeholder" : ""}${
+          lastFedRow === "R" ? " is-last-fed" : ""
+        }`;
+        durR.textContent = rDurSec > 0 ? `R: ${formatDurationSec(rDurSec)}` : "—";
+        durR.title = rDurSec > 0 ? "Edit R duration" : "Add R duration";
+        durR.addEventListener("click", () => {
+          editingFeedDurationId = f.id;
+          editingFeedDurationSide = durationEditKeyForBreast(f, "R");
+          editingFeedTimeId = null;
+          renderFeeds();
+        });
 
-      rowMeta.append(durations, bottom);
+        const total = document.createElement("span");
+        total.className = "feed-total-pill";
+        total.textContent = totalText;
+
+        const durations = document.createElement("div");
+        durations.className = "feed-meta-durations";
+        durations.append(durL, durR);
+
+        const spacer = document.createElement("span");
+        spacer.className = "history-meta-spacer";
+
+        const bottom = document.createElement("div");
+        bottom.className = "feed-meta-bottom";
+        bottom.append(timeBtn, spacer, total, makeDel());
+
+        rowMeta.append(durations, bottom);
+      }
     } else {
       rowMeta.classList.add("feed-row-meta");
       rowMeta.classList.add("history-item-row--edit");

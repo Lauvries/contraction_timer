@@ -1047,6 +1047,10 @@ body.app-loading .main-btn {
   margin: 0.75rem 0;
 }
 
+.feeding-triplet--quick {
+  grid-template-columns: 1fr 1fr;
+}
+
 .feeding-stop-mid {
   width: 78px;
   height: 78px;
@@ -1379,6 +1383,29 @@ body.app-loading .main-btn {
   padding: 0.18rem 0.45rem;
   border-radius: 999px;
   margin-right: 6px;
+}
+
+.feed-row-meta--quick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.feed-ql-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.feed-ql-sides {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--accent);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
 }
 
 .history-item.is-addable {
