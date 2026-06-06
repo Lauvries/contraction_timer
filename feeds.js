@@ -2,7 +2,7 @@
  * Feeds (breastfeeding) data access + realtime sync.
  *
  * Table: public.feeds
- * Columns: id, user_id, started_at_ms, side1, duration1_sec, side2, duration2_sec
+ * Columns: id, user_id, started_at_ms, side1, duration1_sec, side2, duration2_sec, quick_log
  */
 
 /** @typedef {"L"|"R"} BreastSide */
@@ -15,6 +15,7 @@
  * @property {number} duration1Sec
  * @property {BreastSide | null} side2
  * @property {number | null} duration2Sec
+ * @property {boolean} quickLog
  */
 
 /**
@@ -50,6 +51,7 @@ function normalizeFeedRow(r) {
     duration1Sec: Math.floor(duration1Sec),
     side2,
     duration2Sec: duration2Sec == null ? null : Math.floor(duration2Sec),
+    quickLog: Boolean(r.quick_log),
   };
 }
 
@@ -71,7 +73,7 @@ function newId() {
 export async function pullFeeds(supabase) {
   const { data, error } = await supabase
     .from("feeds")
-    .select("id, started_at_ms, side1, duration1_sec, side2, duration2_sec")
+    .select("id, started_at_ms, side1, duration1_sec, side2, duration2_sec, quick_log")
     .order("started_at_ms", { ascending: false })
     .limit(100);
   if (error) throw error;
@@ -93,7 +95,7 @@ export async function pullFeeds(supabase) {
 export async function pullFeedsForDay(supabase, startMs, endMs) {
   const { data, error } = await supabase
     .from("feeds")
-    .select("id, started_at_ms, side1, duration1_sec, side2, duration2_sec")
+    .select("id, started_at_ms, side1, duration1_sec, side2, duration2_sec, quick_log")
     .gte("started_at_ms", startMs)
     .lt("started_at_ms", endMs)
     .order("started_at_ms", { ascending: true });
@@ -105,7 +107,7 @@ export async function pullFeedsForDay(supabase, startMs, endMs) {
 
 /**
  * @param {import("@supabase/supabase-js").SupabaseClient} supabase
- * @param {{ startedAtMs: number, side1: BreastSide, duration1Sec: number, side2?: BreastSide | null, duration2Sec?: number | null }} input
+ * @param {{ startedAtMs: number, side1: BreastSide, duration1Sec: number, side2?: BreastSide | null, duration2Sec?: number | null, quickLog?: boolean }} input
  * @returns {Promise<FeedRow>}
  */
 export async function insertFeed(supabase, input) {
@@ -125,6 +127,7 @@ export async function insertFeed(supabase, input) {
     side2: input.side2 ?? null,
     duration2_sec:
       input.duration2Sec == null || input.duration2Sec === undefined ? null : Math.max(0, Math.floor(input.duration2Sec)),
+    quick_log: Boolean(input.quickLog),
   };
 
   const { error } = await supabase.from("feeds").insert(row);
@@ -137,6 +140,7 @@ export async function insertFeed(supabase, input) {
     duration1Sec: row.duration1_sec,
     side2: row.side2,
     duration2Sec: row.duration2_sec,
+    quickLog: row.quick_log,
   };
 }
 

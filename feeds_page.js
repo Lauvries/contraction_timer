@@ -740,7 +740,7 @@ async function quickLogSide(side) {
       try {
         await addSecondSide(supabase, lastQuickLoggedId, { side2: side, duration2Sec: 0 });
         const i = feeds.findIndex((f) => f.id === lastQuickLoggedId);
-        if (i !== -1) feeds[i] = { ...feeds[i], side2: side, duration2Sec: 0 };
+        if (i !== -1) feeds[i] = { ...feeds[i], side2: side, duration2Sec: 0, quickLog: true };
         clearQuickLogPending();
         renderFeeds();
         renderFeedButtons();
@@ -761,6 +761,7 @@ async function quickLogSide(side) {
       startedAtMs: Date.now(),
       side1: side,
       duration1Sec: 0,
+      quickLog: true,
     });
     feeds.unshift(row);
     feeds.sort((a, b) => b.startedAtMs - a.startedAtMs);
@@ -941,8 +942,7 @@ function renderFeeds() {
     li.classList.toggle("is-editing", isEditingTime || isEditingDuration);
 
     if (!isEditingTime && !isEditingDuration) {
-      // A feed is a "quick-log" entry when it has no measured duration.
-      const isQuickLogFeed = f.duration1Sec === 0 && (f.duration2Sec == null || f.duration2Sec === 0);
+      const isQuickLogFeed = f.quickLog === true;
       rowMeta.classList.add("feed-row-meta");
 
       const makeDel = () => {
