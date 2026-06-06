@@ -27,7 +27,7 @@ const loginSubmitBtn = document.getElementById("loginSubmit");
 // but proportional to the device. 1 hour ≈ screen_height / 8.
 // ---------------------------------------------------------------------------
 
-const TIMELINE_SCALE = 3;
+const TIMELINE_SCALE = 2;
 
 function getPxPerMin() {
   const h = (timelineScroll && timelineScroll.clientHeight > 0)
