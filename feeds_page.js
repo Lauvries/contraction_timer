@@ -983,7 +983,15 @@ function renderFeeds() {
           el.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--${side} feed-ql-time-cell${
             !hasSide ? " is-placeholder" : ""}${lastFedRow === side ? " is-last-fed" : ""}`;
           el.textContent = hasSide ? `${side}  ${time}` : "—";
-          if (!hasSide && !f.side2) {
+          if (hasSide) {
+            el.title = "Edit time";
+            el.addEventListener("click", () => {
+              editingFeedTimeId = f.id;
+              editingFeedDurationId = null;
+              editingFeedDurationSide = null;
+              renderFeeds();
+            });
+          } else if (!f.side2) {
             el.title = `Add ${side} side`;
             el.addEventListener("click", async () => {
               if (!supabase) return;

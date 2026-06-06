@@ -1403,11 +1403,9 @@ body.app-loading .main-btn {
   margin-bottom: 0;
 }
 
-/* Time cells inside quick-log rows: not interactive, use tabular nums. */
+/* Time cells inside quick-log rows. */
 .feed-ql-time-cell {
   font-variant-numeric: tabular-nums;
-  cursor: default;
-  pointer-events: none;
   letter-spacing: 0.01em;
 }
 
@@ -1630,6 +1628,22 @@ html:has(.timeline-scroll) .timeline-scroll {
   position: absolute;
   right: 0;
   z-index: 2;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+.tl-event--feed.is-dragging {
+  z-index: 10;
+  cursor: grabbing;
+}
+
+.tl-event--feed.is-dragging .tl-feed-pill {
+  background: color-mix(in srgb, var(--accent) 30%, var(--surface));
+  box-shadow: 0 4px 18px rgb(0 0 0 / 50%);
+  transform: translateY(-50%) scale(1.07);
+  transition: none;
 }
 
 .tl-feed-pill {

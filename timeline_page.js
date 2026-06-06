@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { pullFeedsForDay, insertFeed } from "./feeds.js";
+import { pullFeedsForDay, insertFeed, updateFeed } from "./feeds.js";
 import { installPullToRefresh } from "./pull_to_refresh.js";
 import { waitForInitialSession } from "./auth.js";
 
@@ -58,6 +58,14 @@ let currentDate = todayMidnight();
 
 /** Last loaded feeds, kept for re-render on resize. @type {import("./feeds.js").FeedRow[]} */
 let currentFeeds = [];
+
+/**
+ * Active touch-drag state for repositioning a feed on the timeline.
+ * @type {{ feedId: string, el: HTMLElement, dotEl: HTMLElement|null, timeSpan: HTMLSpanElement,
+ *          startY: number, startTopPx: number, currentTopPx: number,
+ *          pxPerMin: number, active: boolean } | null}
+ */
+let drag = null;
 
 // ---------------------------------------------------------------------------
 // Date helpers
@@ -259,6 +267,25 @@ function renderTimeline(feeds, _sleeps) {
       el.appendChild(bar);
     }
 
+    // Drag to reposition
+    const feedId = feed.id;
+    const capturedPxPerMin = pxPerMin;
+    el.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) return;
+      e.stopPropagation(); // prevent PTR from intercepting this gesture
+      drag = {
+        feedId,
+        el,
+        dotEl: dot,
+        timeSpan,
+        startY: e.touches[0].clientY,
+        startTopPx: topPx,
+        currentTopPx: topPx,
+        pxPerMin: capturedPxPerMin,
+        active: false,
+      };
+    }, { passive: true });
+
     leftCol.appendChild(el);
   }
 
@@ -329,6 +356,81 @@ async function signInWithPassword() {
     loginSubmitBtn.disabled = false;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Feed drag — reposition by touch
+// ---------------------------------------------------------------------------
+
+document.addEventListener("touchmove", (e) => {
+  if (!drag) return;
+  const dy = e.touches[0].clientY - drag.startY;
+
+  if (!drag.active) {
+    if (Math.abs(dy) < 8) return;
+    drag.active = true;
+    drag.el.classList.add("is-dragging");
+  }
+
+  const newTop = Math.max(0, Math.min(getTimelineHeight(), drag.startTopPx + dy));
+  drag.currentTopPx = newTop;
+  drag.el.style.top = `${newTop}px`;
+  if (drag.dotEl) drag.dotEl.style.top = `${newTop}px`;
+
+  const mins = newTop / drag.pxPerMin;
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  drag.timeSpan.textContent = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}, { passive: true });
+
+document.addEventListener("touchend", () => {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+
+  if (!d.active) return; // was a tap, not a drag
+
+  d.el.classList.remove("is-dragging");
+
+  const mins = d.currentTopPx / d.pxPerMin;
+  const newMs = dayStartMs(currentDate) + Math.round(mins * 60000);
+  const idx = currentFeeds.findIndex((f) => f.id === d.feedId);
+  if (idx === -1 || !supabase) {
+    renderTimeline(currentFeeds, []);
+    return;
+  }
+
+  const prevMs = currentFeeds[idx].startedAtMs;
+  if (Math.abs(newMs - prevMs) < 5000) {
+    renderTimeline(currentFeeds, []);
+    return;
+  }
+
+  currentFeeds[idx] = { ...currentFeeds[idx], startedAtMs: newMs };
+  currentFeeds.sort((a, b) => a.startedAtMs - b.startedAtMs);
+  renderTimeline(currentFeeds, []);
+
+  setSyncMessage("Saving…");
+  updateFeed(supabase, d.feedId, { startedAtMs: newMs })
+    .then(() => setSyncMessage(""))
+    .catch((err) => {
+      console.error(err);
+      setSyncMessage("Could not update time.", true);
+      const ri = currentFeeds.findIndex((f) => f.id === d.feedId);
+      if (ri !== -1) {
+        currentFeeds[ri] = { ...currentFeeds[ri], startedAtMs: prevMs };
+        currentFeeds.sort((a, b) => a.startedAtMs - b.startedAtMs);
+        renderTimeline(currentFeeds, []);
+      }
+    });
+}, { passive: true });
+
+document.addEventListener("touchcancel", () => {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  d.el.classList.remove("is-dragging");
+  renderTimeline(currentFeeds, []);
+}, { passive: true });
 
 // ---------------------------------------------------------------------------
 // Event wiring
