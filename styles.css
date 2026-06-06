@@ -1385,27 +1385,29 @@ body.app-loading .main-btn {
   margin-right: 6px;
 }
 
+/* Quick-log feed row: durations grid + delete button side-by-side */
 .feed-row-meta--quick {
-  display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
-  padding: 6px 0;
 }
 
-.feed-ql-time {
+.feed-meta-durations--ql {
+  flex: 1;
+  min-width: 0;
+  /* Remove the bottom border that separates durations from the bottom row
+     on normal feeds — not needed here since there is no bottom row. */
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+/* Time cells inside quick-log rows: not interactive, use tabular nums. */
+.feed-ql-time-cell {
   font-variant-numeric: tabular-nums;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  flex-shrink: 0;
   cursor: default;
-}
-
-.feed-ql-sides {
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--accent);
-  letter-spacing: 0.03em;
-  flex-shrink: 0;
+  pointer-events: none;
+  letter-spacing: 0.01em;
 }
 
 .history-item.is-addable {

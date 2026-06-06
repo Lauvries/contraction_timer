@@ -941,7 +941,8 @@ function renderFeeds() {
     li.classList.toggle("is-editing", isEditingTime || isEditingDuration);
 
     if (!isEditingTime && !isEditingDuration) {
-      const quickLog = loadQuickLog();
+      // A feed is a "quick-log" entry when it has no measured duration.
+      const isQuickLogFeed = f.duration1Sec === 0 && (f.duration2Sec == null || f.duration2Sec === 0);
       rowMeta.classList.add("feed-row-meta");
 
       const makeDel = () => {
@@ -967,22 +968,31 @@ function renderFeeds() {
         return del;
       };
 
-      if (quickLog) {
-        // Quick-log mode: one compact row — time + side(s) + delete.
-        const timeSpan = document.createElement("span");
-        timeSpan.className = "history-meta-btn history-meta-btn--time feed-ql-time";
-        timeSpan.textContent = formatTimeOnly(f.startedAtMs);
+      if (isQuickLogFeed) {
+        // Quick-log feed: single row — same 2-cell grid as normal but shows
+        // start time instead of duration. No bottom row, no total pill.
+        const time = formatTimeOnly(f.startedAtMs);
+        const lastFedRow = inferLastFedFromFeed(f);
 
-        const sides = [f.side1, f.side2].filter(Boolean);
-        const sidesSpan = document.createElement("span");
-        sidesSpan.className = "feed-ql-sides";
-        sidesSpan.textContent = sides.join(" + ");
+        const hasL = f.side1 === "L" || f.side2 === "L";
+        const hasR = f.side1 === "R" || f.side2 === "R";
 
-        const spacer = document.createElement("span");
-        spacer.className = "history-meta-spacer";
+        const cellL = document.createElement("span");
+        cellL.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--L feed-ql-time-cell${
+          !hasL ? " is-placeholder" : ""}${lastFedRow === "L" ? " is-last-fed" : ""}`;
+        cellL.textContent = hasL ? `L  ${time}` : "—";
+
+        const cellR = document.createElement("span");
+        cellR.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--R feed-ql-time-cell${
+          !hasR ? " is-placeholder" : ""}${lastFedRow === "R" ? " is-last-fed" : ""}`;
+        cellR.textContent = hasR ? `R  ${time}` : "—";
+
+        const durations = document.createElement("div");
+        durations.className = "feed-meta-durations feed-meta-durations--ql";
+        durations.append(cellL, cellR);
 
         rowMeta.classList.add("feed-row-meta--quick");
-        rowMeta.append(timeSpan, sidesSpan, spacer, makeDel());
+        rowMeta.append(durations, makeDel());
       } else {
         const timeBtn = document.createElement("button");
         timeBtn.type = "button";
