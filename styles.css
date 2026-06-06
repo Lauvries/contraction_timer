@@ -1516,132 +1516,202 @@ html:has(.timeline-scroll) .timeline-scroll {
   position: relative;
 }
 
+/* ---- Inner grid: feeds | spine | sleeps ---- */
 .timeline-inner {
   position: relative;
-  display: flex;
-}
-
-/* Left time axis */
-.tl-axis {
-  width: 52px;
-  flex-shrink: 0;
-  position: relative;
-}
-
-.tl-hour-tick {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding-right: 8px;
-  box-sizing: border-box;
-  transform: translateY(-0.5em);
-}
-
-.tl-hour-label {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-/* Event track */
-.tl-track {
-  flex: 1;
-  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 52px 1fr;
   min-height: 100%;
 }
 
-.tl-grid-line {
+.tl-left,
+.tl-right {
+  position: relative;
+  min-width: 0;
+  overflow: visible;
+}
+
+/* ---- Center spine ---- */
+.tl-center {
+  position: relative;
+}
+
+.tl-spine {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--text-muted) 20%, transparent);
+}
+
+.tl-hour-mark {
   position: absolute;
   left: 0;
   right: 0;
-  height: 1px;
-  background: color-mix(in srgb, var(--border) 40%, transparent);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  transform: translateY(-0.5em);
+  z-index: 1;
+  pointer-events: none;
 }
 
-.tl-grid-line--midnight {
-  background: color-mix(in srgb, var(--border) 80%, transparent);
+.tl-hour-label {
+  font-size: 0.58rem;
+  color: color-mix(in srgb, var(--text-muted) 65%, transparent);
+  font-variant-numeric: tabular-nums;
+  background: var(--bg);
+  padding: 0 2px;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
-/* Current-time indicator */
+/* Dot for each event on the spine */
+.tl-dot {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.tl-dot--feed {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Now indicator on spine */
+.tl-dot--now {
+  width: 11px;
+  height: 11px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent), 0 0 0 2px var(--bg);
+  z-index: 4;
+}
+
+/* Faint "now" line across side columns */
 .tl-now-line {
   position: absolute;
   left: 0;
   right: 0;
-  height: 2px;
-  background: color-mix(in srgb, var(--accent) 80%, transparent);
+  height: 1px;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  pointer-events: none;
   z-index: 2;
 }
 
-.tl-now-line::before {
-  content: "";
+/* ---- Feed events (left column, right-aligned) ---- */
+.tl-event--feed {
   position: absolute;
-  left: -3px;
-  top: -3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
+  right: 0;
+  z-index: 2;
 }
 
-/* Feed events */
-.tl-event {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  z-index: 3;
-}
-
-.tl-event-pill {
+.tl-feed-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  border-radius: 8px;
-  padding: 3px 8px;
-  font-size: 0.75rem;
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  padding: 4px 7px 4px 10px;
+  font-size: 0.72rem;
   white-space: nowrap;
-  max-width: 100%;
-  box-sizing: border-box;
+  transform: translateY(-50%);
+  position: relative;
+  z-index: 1;
 }
 
-.tl-event-time {
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.tl-event-side {
-  font-weight: 700;
+.tl-feed-side {
+  font-weight: 750;
   color: var(--accent);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
 }
 
-.tl-event-dur {
+.tl-feed-time {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
-/* Duration bar below the pill */
-.tl-event-bar {
+.tl-feed-dur {
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.66rem;
+  flex-shrink: 0;
+}
+
+/* Vertical duration bar, starts at the time point, extends downward */
+.tl-feed-bar {
   position: absolute;
-  left: 10px;
-  top: calc(100%);
-  width: 4px;
-  border-radius: 0 0 4px 4px;
+  top: 0;
+  right: 3px;
+  width: 3px;
+  border-radius: 0 0 3px 3px;
   background: color-mix(in srgb, var(--accent) 35%, transparent);
   pointer-events: none;
 }
 
-/* Future: sleep blocks */
-.tl-event--sleep .tl-event-pill {
-  background: color-mix(in srgb, var(--text-muted) 12%, var(--surface));
-  border-color: color-mix(in srgb, var(--text-muted) 25%, transparent);
+/* ---- Sleep events (right column, left-aligned) ---- */
+.tl-event--sleep {
+  position: absolute;
+  left: 0;
+  z-index: 2;
 }
 
-.tl-event--sleep .tl-event-bar {
-  background: color-mix(in srgb, var(--text-muted) 25%, transparent);
+.tl-sleep-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, #14b8a6 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, #14b8a6 30%, transparent);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  padding: 4px 10px 4px 7px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  transform: translateY(-50%);
+  position: relative;
+  z-index: 1;
+}
+
+.tl-sleep-label {
+  font-weight: 750;
+  color: #14b8a6;
+}
+
+.tl-sleep-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-sleep-dur {
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.66rem;
+}
+
+.tl-sleep-bar {
+  position: absolute;
+  top: 0;
+  left: 3px;
+  width: 3px;
+  border-radius: 0 0 3px 3px;
+  background: color-mix(in srgb, #14b8a6 30%, transparent);
+  pointer-events: none;
+}
+
+.tl-dot--sleep {
+  width: 8px;
+  height: 8px;
+  background: #14b8a6;
+  box-shadow: 0 0 0 2px var(--bg);
 }

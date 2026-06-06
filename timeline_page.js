@@ -146,73 +146,87 @@ function renderTimeline(feeds, _sleeps) {
   timelineInner.innerHTML = "";
   timelineInner.style.height = `${TIMELINE_HEIGHT_PX}px`;
 
-  // Hour labels (left axis).
-  const axis = document.createElement("div");
-  axis.className = "tl-axis";
-  for (let h = 0; h < 24; h++) {
-    const tick = document.createElement("div");
-    tick.className = "tl-hour-tick";
-    tick.style.top = `${h * 60 * PX_PER_MIN}px`;
+  const leftCol = document.createElement("div");
+  leftCol.className = "tl-left";
 
+  const centerCol = document.createElement("div");
+  centerCol.className = "tl-center";
+
+  const rightCol = document.createElement("div");
+  rightCol.className = "tl-right";
+
+  // Spine
+  const spine = document.createElement("div");
+  spine.className = "tl-spine";
+  centerCol.appendChild(spine);
+
+  // Hour marks + labels on spine
+  for (let h = 0; h < 24; h++) {
+    const topPx = h * 60 * PX_PER_MIN;
+    const mark = document.createElement("div");
+    mark.className = "tl-hour-mark";
+    mark.style.top = `${topPx}px`;
     const label = document.createElement("span");
     label.className = "tl-hour-label";
     label.textContent = `${String(h).padStart(2, "0")}:00`;
-    tick.appendChild(label);
-    axis.appendChild(tick);
-  }
-  timelineInner.appendChild(axis);
-
-  // Event track (right of axis).
-  const track = document.createElement("div");
-  track.className = "tl-track";
-
-  // Hour grid lines.
-  for (let h = 0; h < 24; h++) {
-    const line = document.createElement("div");
-    line.className = `tl-grid-line${h === 0 ? " tl-grid-line--midnight" : ""}`;
-    line.style.top = `${h * 60 * PX_PER_MIN}px`;
-    track.appendChild(line);
+    mark.appendChild(label);
+    centerCol.appendChild(mark);
   }
 
-  // Current-time indicator (only for today).
+  // Current-time indicator (today only)
   if (dayStartMs(currentDate) === dayStartMs(todayMidnight())) {
-    const nowLine = document.createElement("div");
-    nowLine.className = "tl-now-line";
-    const nowMin = minutesSinceMidnight(Date.now());
-    nowLine.style.top = `${nowMin * PX_PER_MIN}px`;
-    track.appendChild(nowLine);
+    const nowPx = Math.round(minutesSinceMidnight(Date.now()) * PX_PER_MIN);
+
+    const nowDot = document.createElement("div");
+    nowDot.className = "tl-dot tl-dot--now";
+    nowDot.style.top = `${nowPx}px`;
+    centerCol.appendChild(nowDot);
+
+    const nowLineL = document.createElement("div");
+    nowLineL.className = "tl-now-line";
+    nowLineL.style.top = `${nowPx}px`;
+    leftCol.appendChild(nowLineL);
+
+    const nowLineR = document.createElement("div");
+    nowLineR.className = "tl-now-line";
+    nowLineR.style.top = `${nowPx}px`;
+    rightCol.appendChild(nowLineR);
   }
 
-  // Feed events.
+  // Feed events — left column
   for (const feed of feeds) {
-    const topMin = minutesSinceMidnight(feed.startedAtMs);
-    const topPx = topMin * PX_PER_MIN;
-
+    const topPx = Math.round(minutesSinceMidnight(feed.startedAtMs) * PX_PER_MIN);
     const totalSec = feed.duration1Sec + (feed.duration2Sec ?? 0);
     const durationPx = Math.max(0, Math.round((totalSec / 60) * PX_PER_MIN));
+    const sides = [feed.side1, feed.side2].filter(Boolean).join("+");
 
+    // Dot on center spine
+    const dot = document.createElement("div");
+    dot.className = "tl-dot tl-dot--feed";
+    dot.style.top = `${topPx}px`;
+    centerCol.appendChild(dot);
+
+    // Event element in left column
     const el = document.createElement("div");
-    el.className = "tl-event tl-event--feed";
+    el.className = "tl-event--feed";
     el.style.top = `${topPx}px`;
-    if (durationPx > 0) el.style.setProperty("--tl-duration-px", `${durationPx}px`);
 
     const pill = document.createElement("div");
-    pill.className = "tl-event-pill";
-
-    const timeSpan = document.createElement("span");
-    timeSpan.className = "tl-event-time";
-    timeSpan.textContent = formatTime(feed.startedAtMs);
+    pill.className = "tl-feed-pill";
 
     const sideSpan = document.createElement("span");
-    sideSpan.className = "tl-event-side";
-    const sides = [feed.side1, feed.side2].filter(Boolean).join("+");
+    sideSpan.className = "tl-feed-side";
     sideSpan.textContent = sides;
+    pill.appendChild(sideSpan);
 
-    pill.append(timeSpan, sideSpan);
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "tl-feed-time";
+    timeSpan.textContent = formatTime(feed.startedAtMs);
+    pill.appendChild(timeSpan);
 
     if (totalSec > 0) {
       const durSpan = document.createElement("span");
-      durSpan.className = "tl-event-dur";
+      durSpan.className = "tl-feed-dur";
       durSpan.textContent = formatDurationSec(totalSec);
       pill.appendChild(durSpan);
     }
@@ -221,18 +235,18 @@ function renderTimeline(feeds, _sleeps) {
 
     if (durationPx > 4) {
       const bar = document.createElement("div");
-      bar.className = "tl-event-bar";
+      bar.className = "tl-feed-bar";
       bar.style.height = `${durationPx}px`;
       el.appendChild(bar);
     }
 
-    track.appendChild(el);
+    leftCol.appendChild(el);
   }
 
-  // Placeholder for future sleep blocks — rendered here when sleep data arrives.
+  // Sleep events — right column (placeholder until sleep data is added)
   // for (const sleep of _sleeps) { ... }
 
-  timelineInner.appendChild(track);
+  timelineInner.append(leftCol, centerCol, rightCol);
 }
 
 function updateDateLabel() {
