@@ -977,15 +977,34 @@ function renderFeeds() {
         const hasL = f.side1 === "L" || f.side2 === "L";
         const hasR = f.side1 === "R" || f.side2 === "R";
 
-        const cellL = document.createElement("span");
-        cellL.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--L feed-ql-time-cell${
-          !hasL ? " is-placeholder" : ""}${lastFedRow === "L" ? " is-last-fed" : ""}`;
-        cellL.textContent = hasL ? `L  ${time}` : "—";
+        const makeQlCell = (side, hasSide) => {
+          const el = document.createElement("button");
+          el.type = "button";
+          el.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--${side} feed-ql-time-cell${
+            !hasSide ? " is-placeholder" : ""}${lastFedRow === side ? " is-last-fed" : ""}`;
+          el.textContent = hasSide ? `${side}  ${time}` : "—";
+          if (!hasSide && !f.side2) {
+            el.title = `Add ${side} side`;
+            el.addEventListener("click", async () => {
+              if (!supabase) return;
+              setSyncMessage("Adding second side…");
+              try {
+                await addSecondSide(supabase, f.id, { side2: side, duration2Sec: 0 });
+                const i = feeds.findIndex((x) => x.id === f.id);
+                if (i !== -1) feeds[i] = { ...feeds[i], side2: side, duration2Sec: 0 };
+                renderFeeds();
+                setSyncMessage("");
+              } catch (e) {
+                console.error(e);
+                setSyncMessage("Could not add second side.", true);
+              }
+            });
+          }
+          return el;
+        };
 
-        const cellR = document.createElement("span");
-        cellR.className = `history-meta-btn history-meta-btn--dur feed-meta-dur--R feed-ql-time-cell${
-          !hasR ? " is-placeholder" : ""}${lastFedRow === "R" ? " is-last-fed" : ""}`;
-        cellR.textContent = hasR ? `R  ${time}` : "—";
+        const cellL = makeQlCell("L", hasL);
+        const cellR = makeQlCell("R", hasR);
 
         const durations = document.createElement("div");
         durations.className = "feed-meta-durations feed-meta-durations--ql";
