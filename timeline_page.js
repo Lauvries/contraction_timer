@@ -222,12 +222,38 @@ function renderTimeline(feeds, _sleeps) {
     rightCol.appendChild(nowLineR);
   }
 
-  // Feed events — left column
+  // Feed events — expand two-sided feeds into individual per-side items
+  /** @type {Array<{ feed: import("./feeds.js").FeedRow, side: string, timeMs: number, durSec: number, topPx: number, staggered: boolean }>} */
+  const items = [];
   for (const feed of feeds) {
-    const topPx = Math.round(minutesSinceMidnight(feed.startedAtMs) * pxPerMin);
-    const totalSec = feed.duration1Sec + (feed.duration2Sec ?? 0);
-    const durationPx = Math.max(0, Math.round((totalSec / 60) * pxPerMin));
-    const sides = [feed.side1, feed.side2].filter(Boolean).join("+");
+    items.push({ feed, side: feed.side1, timeMs: feed.startedAtMs, durSec: feed.duration1Sec });
+    if (feed.side2) {
+      // For timed feeds side2 starts after side1; for quick-logs they share the same timestamp.
+      const side2Ms = feed.duration1Sec > 0
+        ? feed.startedAtMs + feed.duration1Sec * 1000
+        : feed.startedAtMs;
+      items.push({ feed, side: feed.side2, timeMs: side2Ms, durSec: feed.duration2Sec || 0 });
+    }
+  }
+  items.sort((a, b) => a.timeMs - b.timeMs);
+
+  // Stagger detection — when two pills would visually overlap, push the later one
+  // further from the spine so both labels remain readable.
+  const OVERLAP_PX = 22;
+  let lastTopPx = -999;
+  let lastWasStaggered = false;
+  for (const item of items) {
+    const topPx = Math.round(minutesSinceMidnight(item.timeMs) * pxPerMin);
+    const overlap = (topPx - lastTopPx) < OVERLAP_PX;
+    item.topPx = topPx;
+    item.staggered = overlap && !lastWasStaggered;
+    lastTopPx = topPx;
+    lastWasStaggered = item.staggered;
+  }
+
+  for (const item of items) {
+    const { feed, side, timeMs, durSec, topPx, staggered } = item;
+    const durationPx = Math.max(0, Math.round((durSec / 60) * pxPerMin));
 
     const dot = document.createElement("div");
     dot.className = "tl-dot tl-dot--feed";
@@ -235,7 +261,7 @@ function renderTimeline(feeds, _sleeps) {
     centerCol.appendChild(dot);
 
     const el = document.createElement("div");
-    el.className = "tl-event--feed";
+    el.className = `tl-event--feed${staggered ? " tl-event--feed--staggered" : ""}`;
     el.style.top = `${topPx}px`;
 
     const pill = document.createElement("div");
@@ -243,22 +269,29 @@ function renderTimeline(feeds, _sleeps) {
 
     const sideSpan = document.createElement("span");
     sideSpan.className = "tl-feed-side";
-    sideSpan.textContent = sides;
+    sideSpan.textContent = side;
     pill.appendChild(sideSpan);
 
     const timeSpan = document.createElement("span");
     timeSpan.className = "tl-feed-time";
-    timeSpan.textContent = formatTime(feed.startedAtMs);
+    timeSpan.textContent = formatTime(timeMs);
     pill.appendChild(timeSpan);
 
-    if (totalSec > 0) {
+    if (durSec > 0) {
       const durSpan = document.createElement("span");
       durSpan.className = "tl-feed-dur";
-      durSpan.textContent = formatDurationSec(totalSec);
+      durSpan.textContent = formatDurationSec(durSec);
       pill.appendChild(durSpan);
     }
 
     el.appendChild(pill);
+
+    if (staggered) {
+      // Horizontal arm connecting the offset pill back to the spine
+      const arm = document.createElement("div");
+      arm.className = "tl-feed-arm";
+      el.appendChild(arm);
+    }
 
     if (durationPx > 4) {
       const bar = document.createElement("div");
@@ -267,12 +300,12 @@ function renderTimeline(feeds, _sleeps) {
       el.appendChild(bar);
     }
 
-    // Drag to reposition
+    // Drag to reposition (updates startedAtMs on the parent feed row)
     const feedId = feed.id;
     const capturedPxPerMin = pxPerMin;
     el.addEventListener("touchstart", (e) => {
       if (e.touches.length !== 1) return;
-      e.stopPropagation(); // prevent PTR from intercepting this gesture
+      e.stopPropagation();
       drag = {
         feedId,
         el,

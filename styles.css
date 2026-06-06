@@ -1646,6 +1646,27 @@ html:has(.timeline-scroll) .timeline-scroll {
   transition: none;
 }
 
+/* Staggered pill: offset from spine with a horizontal arm connecting back */
+.tl-event--feed--staggered {
+  right: 28px;
+}
+
+.tl-event--feed--staggered .tl-feed-pill {
+  border-right: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: 8px;
+}
+
+.tl-feed-arm {
+  position: absolute;
+  right: -28px;
+  top: 0;
+  width: 28px;
+  height: 1px;
+  transform: translateY(-50%);
+  background: color-mix(in srgb, var(--accent) 38%, transparent);
+  pointer-events: none;
+}
+
 .tl-feed-pill {
   display: inline-flex;
   align-items: center;

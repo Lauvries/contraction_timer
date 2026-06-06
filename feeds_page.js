@@ -732,28 +732,8 @@ async function quickLogSide(side) {
     return;
   }
 
-  // If we just logged the OTHER side, add this as side2 on the same feed.
-  if (lastQuickLoggedId) {
-    const target = feeds.find((f) => f.id === lastQuickLoggedId);
-    if (target && target.side1 !== side && !target.side2) {
-      setSyncMessage("Adding second side…");
-      try {
-        await addSecondSide(supabase, lastQuickLoggedId, { side2: side, duration2Sec: 0 });
-        const i = feeds.findIndex((f) => f.id === lastQuickLoggedId);
-        if (i !== -1) feeds[i] = { ...feeds[i], side2: side, duration2Sec: 0, quickLog: true };
-        clearQuickLogPending();
-        renderFeeds();
-        renderFeedButtons();
-        setSyncMessage("");
-      } catch (e) {
-        console.error(e);
-        setSyncMessage("Could not add second side.", true);
-      }
-      return;
-    }
-    // Same side pressed again, or no matching feed — start fresh.
-    clearQuickLogPending();
-  }
+  // Each breast is its own feed entry — no auto-joining of sides.
+  clearQuickLogPending();
 
   setSyncMessage("Saving…");
   try {
