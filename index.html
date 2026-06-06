@@ -15,6 +15,8 @@
         <a class="top-nav-link is-active" href="./index.html" aria-current="page">Feeds</a>
         <span class="top-nav-sep" aria-hidden="true">·</span>
         <a class="top-nav-link" href="./contractions.html">Contractions</a>
+        <span class="top-nav-sep" aria-hidden="true">·</span>
+        <a class="top-nav-link" href="./timeline.html">Timeline</a>
       </nav>
 
       <header class="header baby-header">
@@ -88,11 +90,31 @@
             Clear all feeds
           </button>
           <div class="app-footer-trailing">
+            <button type="button" class="header-options-btn" id="feedOptions" aria-haspopup="dialog">Options</button>
             <button type="button" class="header-options-btn" id="signOutBtn" hidden>Sign out</button>
           </div>
         </div>
       </footer>
     </div>
+
+    <dialog class="options-dialog" id="feedOptionsDialog" aria-labelledby="feedOptionsTitle">
+      <form method="dialog" class="options-form" id="feedOptionsForm">
+        <h2 id="feedOptionsTitle" class="options-title">Feed options</h2>
+
+        <div class="options-field options-field--live-timer">
+          <label class="toggle-label toggle-label--in-form">
+            <span class="toggle-text">Quick log (no timer)</span>
+            <input type="checkbox" id="feedQuickLogToggle" class="toggle-input" />
+            <span class="toggle-switch" aria-hidden="true"></span>
+          </label>
+          <p class="options-hint options-hint--timer" id="feedQuickLogHint"></p>
+        </div>
+
+        <div class="options-actions">
+          <button type="submit" class="btn-primary">Done</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog class="options-dialog login-dialog" id="loginDialog" aria-labelledby="loginTitle" aria-modal="true">
       <form class="options-form" id="loginForm">

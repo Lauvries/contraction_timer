@@ -82,6 +82,28 @@ export async function pullFeeds(supabase) {
 }
 
 /**
+ * Pull all feeds whose startedAtMs falls within [startMs, endMs).
+ * Returned in ascending time order — suitable for timeline rendering.
+ *
+ * @param {import("@supabase/supabase-js").SupabaseClient} supabase
+ * @param {number} startMs - inclusive lower bound (e.g. local midnight)
+ * @param {number} endMs   - exclusive upper bound (e.g. next local midnight)
+ * @returns {Promise<FeedRow[]>}
+ */
+export async function pullFeedsForDay(supabase, startMs, endMs) {
+  const { data, error } = await supabase
+    .from("feeds")
+    .select("id, started_at_ms, side1, duration1_sec, side2, duration2_sec")
+    .gte("started_at_ms", startMs)
+    .lt("started_at_ms", endMs)
+    .order("started_at_ms", { ascending: true });
+  if (error) throw error;
+  return (data || [])
+    .map((r) => normalizeFeedRow(/** @type {Record<string, unknown>} */ (r)))
+    .filter(Boolean);
+}
+
+/**
  * @param {import("@supabase/supabase-js").SupabaseClient} supabase
  * @param {{ startedAtMs: number, side1: BreastSide, duration1Sec: number, side2?: BreastSide | null, duration2Sec?: number | null }} input
  * @returns {Promise<FeedRow>}

@@ -1394,3 +1394,224 @@ body.app-loading .main-btn {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* ============================================================
+   Timeline page
+   ============================================================ */
+
+/* On the timeline page the .app wrapper needs to stretch full height. */
+.timeline-scroll ~ * ,
+.timeline-scroll {
+  /* Handled via body/html height in the timeline layout below. */
+}
+
+html:has(.timeline-scroll) body,
+html:has(.timeline-scroll) .app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+html:has(.timeline-scroll) .timeline-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.timeline-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.timeline-nav-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+
+.timeline-nav-btn:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.timeline-nav-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.timeline-today-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 0 12px;
+  height: 36px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.12s;
+  flex-shrink: 0;
+}
+
+.timeline-today-btn:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.timeline-date-label {
+  flex: 1;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.timeline-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+.timeline-inner {
+  position: relative;
+  display: flex;
+}
+
+/* Left time axis */
+.tl-axis {
+  width: 52px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tl-hour-tick {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 8px;
+  box-sizing: border-box;
+  transform: translateY(-0.5em);
+}
+
+.tl-hour-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Event track */
+.tl-track {
+  flex: 1;
+  position: relative;
+  min-height: 100%;
+}
+
+.tl-grid-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.tl-grid-line--midnight {
+  background: color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+/* Current-time indicator */
+.tl-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: color-mix(in srgb, var(--accent) 80%, transparent);
+  z-index: 2;
+}
+
+.tl-now-line::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Feed events */
+.tl-event {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  z-index: 3;
+}
+
+.tl-event-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.tl-event-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-event-side {
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+.tl-event-dur {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Duration bar below the pill */
+.tl-event-bar {
+  position: absolute;
+  left: 10px;
+  top: calc(100%);
+  width: 4px;
+  border-radius: 0 0 4px 4px;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  pointer-events: none;
+}
+
+/* Future: sleep blocks */
+.tl-event--sleep .tl-event-pill {
+  background: color-mix(in srgb, var(--text-muted) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--text-muted) 25%, transparent);
+}
+
+.tl-event--sleep .tl-event-bar {
+  background: color-mix(in srgb, var(--text-muted) 25%, transparent);
+}

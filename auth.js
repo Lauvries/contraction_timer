@@ -35,9 +35,11 @@ export async function waitForInitialSession(sb, opts) {
     const { data } = sb.auth.onAuthStateChange((event, session) => {
       if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         finish(session);
-      } else if (event === "SIGNED_OUT") {
-        finish(null);
       }
+      // SIGNED_OUT is intentionally not handled here: Supabase v2 can emit SIGNED_OUT
+      // before INITIAL_SESSION when clearing a stale session, which would resolve this
+      // promise as null before the real session arrives. Let the timeout call getSession()
+      // as the authoritative fallback instead.
     });
     const sub = data?.subscription;
 

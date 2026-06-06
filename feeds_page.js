@@ -8,6 +8,7 @@ const signOutBtn = document.getElementById("signOutBtn");
 
 const DEBUG_STATE_KEY = "baby_debug_state_v1";
 const FEED_STATE_KEY = "baby_feed_state_v1";
+const FEED_QUICK_LOG_KEY = "feed_quick_log_v1";
 const MAX_DEBUG_LOGS = 250;
 
 const loginDialog = document.getElementById("loginDialog");
@@ -36,6 +37,12 @@ const feedsNextPageBtn = document.getElementById("feedsNextPage");
 const feedsPageLabel = document.getElementById("feedsPageLabel");
 const feedsClearAllBtn = document.getElementById("feedsClearAllBtn");
 
+const feedOptionsBtn = document.getElementById("feedOptions");
+const feedOptionsDialog = document.getElementById("feedOptionsDialog");
+const feedOptionsForm = document.getElementById("feedOptionsForm");
+const feedQuickLogToggle = document.getElementById("feedQuickLogToggle");
+const feedQuickLogHint = document.getElementById("feedQuickLogHint");
+
 const FEEDS_PAGE_SIZE = 20;
 let feedsPage = 0;
 
@@ -55,6 +62,12 @@ let feedsUnsub = null;
 
 /** @type {string | null} */
 let editingExistingFeedId = null;
+
+/** Id of the most-recently quick-logged feed, so the other side can be appended to it. */
+/** @type {string | null} */
+let lastQuickLoggedId = null;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let lastQuickLoggedTimer = null;
 
 /** @type {null | { side: "L" | "R", startedWallMs: number, pausedAtWallMs: number | null, pausedTotalMs: number }} */
 let active = null;
@@ -226,7 +239,7 @@ function setLoginError(text) {
 
 function showLogin() {
   setLoginError("");
-  if (loginDialog && typeof loginDialog.showModal === "function") {
+  if (loginDialog && typeof loginDialog.showModal === "function" && !loginDialog.open) {
     loginDialog.showModal();
     loginEmailInput?.focus();
   }
@@ -328,9 +341,41 @@ function iconFor(side) {
 }
 
 function renderFeedButtons() {
+  const quickLog = loadQuickLog();
+
+  // Quick-log mode: simplified button state — no timer, show logged/pending state.
+  if (quickLog) {
+    const pendingFeed = lastQuickLoggedId ? feeds.find((f) => f.id === lastQuickLoggedId) : null;
+    const pendingSide = pendingFeed?.side1 ?? null;
+    const otherPending = pendingSide ? otherSide(pendingSide) : null;
+
+    if (feedLeftText) {
+      feedLeftText.textContent = otherPending === "L" ? "Also L" : "Left";
+    }
+    if (feedRightText) {
+      feedRightText.textContent = otherPending === "R" ? "Also R" : "Right";
+    }
+    if (feedLeftIcon) feedLeftIcon.textContent = pendingSide === "L" ? "✓" : "";
+    if (feedRightIcon) feedRightIcon.textContent = pendingSide === "R" ? "✓" : "";
+
+    feedLeftBtn.classList.toggle("is-active", false);
+    feedRightBtn.classList.toggle("is-active", false);
+    feedLeftBtn.classList.toggle("is-paused", false);
+    feedRightBtn.classList.toggle("is-paused", false);
+
+    const lastFedSide = pendingSide ?? (feeds[0] ? inferLastFedFromFeed(feeds[0]) : null);
+    feedLeftBtn.classList.toggle("feeding-last-fed", lastFedSide === "L");
+    feedRightBtn.classList.toggle("feeding-last-fed", lastFedSide === "R");
+
+    if (feedStopMidBtn) feedStopMidBtn.hidden = true;
+    return;
+  }
+
   const activeSide = active?.side ?? null;
   const running = activeSide !== null && active?.pausedAtWallMs == null;
   const paused = activeSide !== null && active?.pausedAtWallMs != null;
+
+  if (feedStopMidBtn) feedStopMidBtn.hidden = false;
 
   const lMs = sideTotalMs("L");
   const rMs = sideTotalMs("R");
@@ -617,6 +662,10 @@ async function stopActiveAndFinalizeFeed() {
 }
 
 async function onPressSide(side) {
+  if (loadQuickLog()) {
+    await quickLogSide(side);
+    return;
+  }
   if (!active) {
     startSide(side);
     return;
@@ -642,8 +691,91 @@ function resetFlow() {
   lastBeepBucketBySide = { L: 0, R: 0 };
   lastFedSideThisSession = null;
   editingExistingFeedId = null;
+  clearQuickLogPending();
   renderFeedButtons();
   persistFeedFlowState();
+}
+
+function loadQuickLog() {
+  return localStorage.getItem(FEED_QUICK_LOG_KEY) === "1";
+}
+
+function saveQuickLog(on) {
+  localStorage.setItem(FEED_QUICK_LOG_KEY, on ? "1" : "0");
+}
+
+function syncQuickLogHint() {
+  if (!feedQuickLogHint) return;
+  feedQuickLogHint.textContent = loadQuickLog()
+    ? "Pressing L or R immediately logs a feed at that time — no timer."
+    : "Pressing L or R starts a timer to measure feeding duration.";
+}
+
+function clearQuickLogPending() {
+  if (lastQuickLoggedTimer != null) {
+    clearTimeout(lastQuickLoggedTimer);
+    lastQuickLoggedTimer = null;
+  }
+  lastQuickLoggedId = null;
+}
+
+/**
+ * Quick-log mode: immediately save a feed for the pressed side.
+ * If the other side was just logged (within 5 min), add it as side2 instead.
+ * @param {"L" | "R"} side
+ */
+async function quickLogSide(side) {
+  if (!supabase) {
+    setSyncMessage("Not connected — sign in first.", true);
+    return;
+  }
+
+  // If we just logged the OTHER side, add this as side2 on the same feed.
+  if (lastQuickLoggedId) {
+    const target = feeds.find((f) => f.id === lastQuickLoggedId);
+    if (target && target.side1 !== side && !target.side2) {
+      setSyncMessage("Adding second side…");
+      try {
+        await addSecondSide(supabase, lastQuickLoggedId, { side2: side, duration2Sec: 0 });
+        const i = feeds.findIndex((f) => f.id === lastQuickLoggedId);
+        if (i !== -1) feeds[i] = { ...feeds[i], side2: side, duration2Sec: 0 };
+        clearQuickLogPending();
+        renderFeeds();
+        renderFeedButtons();
+        setSyncMessage("");
+      } catch (e) {
+        console.error(e);
+        setSyncMessage("Could not add second side.", true);
+      }
+      return;
+    }
+    // Same side pressed again, or no matching feed — start fresh.
+    clearQuickLogPending();
+  }
+
+  setSyncMessage("Saving…");
+  try {
+    const row = await insertFeed(supabase, {
+      startedAtMs: Date.now(),
+      side1: side,
+      duration1Sec: 0,
+    });
+    feeds.unshift(row);
+    feeds.sort((a, b) => b.startedAtMs - a.startedAtMs);
+    lastQuickLoggedId = row.id;
+    // Auto-clear pending state after 5 minutes.
+    lastQuickLoggedTimer = setTimeout(() => {
+      lastQuickLoggedId = null;
+      lastQuickLoggedTimer = null;
+      renderFeedButtons();
+    }, 5 * 60 * 1000);
+    renderFeeds();
+    renderFeedButtons();
+    setSyncMessage("");
+  } catch (e) {
+    console.error(e);
+    setSyncMessage("Could not save feed.", true);
+  }
 }
 
 function totalDurationSec(feed) {
@@ -915,6 +1047,9 @@ function renderFeeds() {
           const startedAtMs = applyTimeStringToStartedAtMs(f.startedAtMs, input.value);
           try {
             await updateFeed(supabase, f.id, { startedAtMs });
+            const i = feeds.findIndex((x) => x.id === f.id);
+            if (i !== -1) feeds[i] = { ...feeds[i], startedAtMs };
+            renderFeeds();
             setSyncMessage("");
           } catch (e) {
             console.error(e);
@@ -1003,14 +1138,20 @@ function renderFeeds() {
           try {
             if (sideKey === "side1") {
               await updateFeed(supabase, f.id, { duration1Sec: parsed });
+              const i = feeds.findIndex((x) => x.id === f.id);
+              if (i !== -1) feeds[i] = { ...feeds[i], duration1Sec: parsed };
+              renderFeeds();
             } else if (sideKey === "side2") {
               await updateFeed(supabase, f.id, { duration2Sec: parsed });
+              const i = feeds.findIndex((x) => x.id === f.id);
+              if (i !== -1) feeds[i] = { ...feeds[i], duration2Sec: parsed };
+              renderFeeds();
             } else if (sideKey === "side2_add") {
               const side2 = otherSide(f.side1);
               await addSecondSide(supabase, f.id, { side2, duration2Sec: parsed });
-              // Optimistic update (realtime will also reconcile).
               const i = feeds.findIndex((x) => x.id === f.id);
               if (i !== -1) feeds[i] = { ...feeds[i], side2, duration2Sec: parsed };
+              renderFeeds();
             }
             setSyncMessage("");
           } catch (e) {
@@ -1250,12 +1391,37 @@ loginForm?.addEventListener("submit", (e) => {
 loginDialog?.addEventListener("cancel", (e) => e.preventDefault());
 signOutBtn?.addEventListener("click", () => void signOut());
 
+feedOptionsBtn?.addEventListener("click", () => {
+  if (!feedQuickLogToggle || !feedOptionsDialog) return;
+  feedQuickLogToggle.checked = loadQuickLog();
+  syncQuickLogHint();
+  if (typeof feedOptionsDialog.showModal === "function") feedOptionsDialog.showModal();
+});
+feedOptionsForm?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  feedOptionsDialog?.close();
+});
+feedOptionsDialog?.addEventListener("click", (e) => {
+  if (e.target === feedOptionsDialog) feedOptionsDialog.close();
+});
+feedQuickLogToggle?.addEventListener("change", () => {
+  const on = /** @type {HTMLInputElement} */ (feedQuickLogToggle).checked;
+  saveQuickLog(on);
+  if (!on) {
+    // Switching back to timer mode: discard any quick-log pending state.
+    clearQuickLogPending();
+  }
+  syncQuickLogHint();
+  renderFeedButtons();
+});
+
 // Smoke indicator that feeds_page.js booted and handlers attached.
 setSyncMessage("");
 
 async function bootstrap() {
   installPullToRefresh();
   installDebugHooks();
+  syncQuickLogHint();
   // Prefer restoring an in-progress timer across reloads/backgrounding.
   const restored = restoreFeedFlowState();
   if (!restored) resetFlow();
