@@ -1,7 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { pullFeedsForDay, insertFeed, updateFeed } from "./feeds.js";
+import { pullSleepsForDay } from "./sleeps.js";
 import { installPullToRefresh } from "./pull_to_refresh.js";
 import { waitForInitialSession } from "./auth.js";
+import { applyTabVisibility } from "./nav.js";
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -58,6 +60,9 @@ let currentDate = todayMidnight();
 
 /** Last loaded feeds, kept for re-render on resize. @type {import("./feeds.js").FeedRow[]} */
 let currentFeeds = [];
+
+/** Last loaded sleep sessions, kept for re-render on resize. @type {import("./sleeps.js").SleepRow[]} */
+let currentSleeps = [];
 
 /**
  * Active touch-drag state for repositioning a feed on the timeline.
@@ -165,9 +170,9 @@ function formatDurationSec(sec) {
 
 /**
  * @param {import("./feeds.js").FeedRow[]} feeds
- * @param {Array<never>} _sleeps  — reserved for future sleep data
+ * @param {import("./sleeps.js").SleepRow[]} sleeps
  */
-function renderTimeline(feeds, _sleeps) {
+function renderTimeline(feeds, sleeps) {
   if (!timelineInner) return;
   const pxPerMin = getPxPerMin();
   const totalH = getTimelineHeight();
@@ -289,8 +294,61 @@ function renderTimeline(feeds, _sleeps) {
     leftCol.appendChild(el);
   }
 
-  // Sleep events — right column (placeholder until sleep data is added)
-  // for (const sleep of _sleeps) { ... }
+  // Sleep events — right column. Sessions may span midnight; clip each one to
+  // the portion visible on this day so position + bar length stay consistent
+  // with the label (a long night's sleep shows split across two day views).
+  const dayStart = dayStartMs(currentDate);
+  const dayEnd = dayEndMs(currentDate);
+  for (const sleep of sleeps) {
+    const visStart = Math.max(sleep.startedAtMs, dayStart);
+    const visEndRaw = sleep.endedAtMs ?? Date.now();
+    const visEnd = Math.min(visEndRaw, dayEnd);
+    if (visEnd <= visStart) continue;
+
+    const topPx = Math.round(minutesSinceMidnight(visStart) * pxPerMin);
+    const totalSec = Math.round((visEnd - visStart) / 1000);
+    const durationPx = Math.max(0, Math.round((totalSec / 60) * pxPerMin));
+
+    const dot = document.createElement("div");
+    dot.className = "tl-dot tl-dot--sleep";
+    dot.style.top = `${topPx}px`;
+    centerCol.appendChild(dot);
+
+    const el = document.createElement("div");
+    el.className = "tl-event--sleep";
+    el.style.top = `${topPx}px`;
+
+    const pill = document.createElement("div");
+    pill.className = "tl-sleep-pill";
+
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "tl-sleep-label";
+    labelSpan.textContent = "💤";
+    pill.appendChild(labelSpan);
+
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "tl-sleep-time";
+    timeSpan.textContent = formatTime(visStart);
+    pill.appendChild(timeSpan);
+
+    if (totalSec > 0) {
+      const durSpan = document.createElement("span");
+      durSpan.className = "tl-sleep-dur";
+      durSpan.textContent = sleep.endedAtMs == null ? `${formatDurationSec(totalSec)}…` : formatDurationSec(totalSec);
+      pill.appendChild(durSpan);
+    }
+
+    el.appendChild(pill);
+
+    if (durationPx > 4) {
+      const bar = document.createElement("div");
+      bar.className = "tl-sleep-bar";
+      bar.style.height = `${durationPx}px`;
+      el.appendChild(bar);
+    }
+
+    rightCol.appendChild(el);
+  }
 
   timelineInner.append(leftCol, centerCol, rightCol);
 }
@@ -324,9 +382,13 @@ async function loadDay(date, scrollToNow) {
   if (!supabase) return;
   setSyncMessage("Loading…");
   try {
-    const feeds = await pullFeedsForDay(supabase, dayStartMs(date), dayEndMs(date));
+    const [feeds, sleeps] = await Promise.all([
+      pullFeedsForDay(supabase, dayStartMs(date), dayEndMs(date)),
+      pullSleepsForDay(supabase, dayStartMs(date), dayEndMs(date)),
+    ]);
     currentFeeds = feeds;
-    renderTimeline(feeds, []);
+    currentSleeps = sleeps;
+    renderTimeline(feeds, sleeps);
     if (scrollToNow) scrollToNowOrFirstEvent(feeds);
     setSyncMessage("");
   } catch (e) {
@@ -395,19 +457,19 @@ document.addEventListener("touchend", () => {
   const newMs = dayStartMs(currentDate) + Math.round(mins * 60000);
   const idx = currentFeeds.findIndex((f) => f.id === d.feedId);
   if (idx === -1 || !supabase) {
-    renderTimeline(currentFeeds, []);
+    renderTimeline(currentFeeds, currentSleeps);
     return;
   }
 
   const prevMs = currentFeeds[idx].startedAtMs;
   if (Math.abs(newMs - prevMs) < 5000) {
-    renderTimeline(currentFeeds, []);
+    renderTimeline(currentFeeds, currentSleeps);
     return;
   }
 
   currentFeeds[idx] = { ...currentFeeds[idx], startedAtMs: newMs };
   currentFeeds.sort((a, b) => a.startedAtMs - b.startedAtMs);
-  renderTimeline(currentFeeds, []);
+  renderTimeline(currentFeeds, currentSleeps);
 
   setSyncMessage("Saving…");
   updateFeed(supabase, d.feedId, { startedAtMs: newMs })
@@ -419,7 +481,7 @@ document.addEventListener("touchend", () => {
       if (ri !== -1) {
         currentFeeds[ri] = { ...currentFeeds[ri], startedAtMs: prevMs };
         currentFeeds.sort((a, b) => a.startedAtMs - b.startedAtMs);
-        renderTimeline(currentFeeds, []);
+        renderTimeline(currentFeeds, currentSleeps);
       }
     });
 }, { passive: true });
@@ -429,7 +491,7 @@ document.addEventListener("touchcancel", () => {
   const d = drag;
   drag = null;
   d.el.classList.remove("is-dragging");
-  renderTimeline(currentFeeds, []);
+  renderTimeline(currentFeeds, currentSleeps);
 }, { passive: true });
 
 // ---------------------------------------------------------------------------
@@ -499,7 +561,7 @@ async function quickLog(side) {
       quickLog: true,
     });
     currentFeeds = [...currentFeeds, feed].sort((a, b) => a.startedAtMs - b.startedAtMs);
-    renderTimeline(currentFeeds, []);
+    renderTimeline(currentFeeds, currentSleeps);
     setSyncMessage("");
   } catch (e) {
     console.error(e);
@@ -515,6 +577,7 @@ fabRight?.addEventListener("click", () => void quickLog("R"));
 // ---------------------------------------------------------------------------
 
 async function bootstrap() {
+  applyTabVisibility();
   installPullToRefresh();
   updateDateLabel();
 
@@ -523,7 +586,7 @@ async function bootstrap() {
   // will be called with real data once loadDay finishes.
   if (typeof ResizeObserver !== "undefined" && timelineScroll) {
     new ResizeObserver(() => {
-      if (currentFeeds.length > 0) renderTimeline(currentFeeds, []);
+      if (currentFeeds.length > 0) renderTimeline(currentFeeds, currentSleeps);
     }).observe(timelineScroll);
   }
 

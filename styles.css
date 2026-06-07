@@ -974,6 +974,69 @@ body.app-loading .main-btn {
   color: var(--text-muted);
 }
 
+/* ---- Options page: tab visibility list ---- */
+.app-layout--single {
+  display: block;
+}
+
+.options-page-intro {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.options-tab-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.options-tab-list .toggle-label {
+  margin: 0;
+}
+
+/* ---- Sleep page ---- */
+.sleep-log-past-btn {
+  margin-top: 0;
+}
+
+.sleep-manual-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sleep-manual-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sleep-manual-edit-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.sleep-ongoing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #14b8a6;
+  background: color-mix(in srgb, #14b8a6 16%, transparent);
+  border: 1px solid color-mix(in srgb, #14b8a6 35%, transparent);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
 .options-actions {
   display: flex;
   flex-wrap: wrap;

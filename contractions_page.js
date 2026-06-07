@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { installPullToRefresh } from "./pull_to_refresh.js";
 import { waitForInitialSession } from "./auth.js";
+import { applyTabVisibility } from "./nav.js";
 
 const STORAGE_KEY = "contraction-timer-v1";
 const LAST_INTENSITY_KEY = "lastIntensity";
@@ -1094,6 +1095,7 @@ async function signOutCloud() {
 }
 
 async function bootstrap() {
+  applyTabVisibility();
   document.body.classList.add("app-loading");
   setSyncMessage("");
   installPullToRefresh();

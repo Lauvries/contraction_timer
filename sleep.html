@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a1523" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Sleep</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <nav class="top-nav" aria-label="Primary">
+        <a class="top-nav-link" data-tab="feeds" href="./index.html">Feeds</a>
+        <span class="top-nav-sep" aria-hidden="true">·</span>
+        <a class="top-nav-link" data-tab="contractions" href="./contractions.html">Contractions</a>
+        <span class="top-nav-sep" aria-hidden="true">·</span>
+        <a class="top-nav-link" data-tab="timeline" href="./timeline.html">Timeline</a>
+        <span class="top-nav-sep" aria-hidden="true">·</span>
+        <a class="top-nav-link is-active" data-tab="sleep" href="./sleep.html" aria-current="page">Sleep</a>
+        <span class="top-nav-sep" aria-hidden="true">·</span>
+        <a class="top-nav-link" href="./options.html">Options</a>
+      </nav>
+
+      <div class="app-layout">
+        <div class="app-panel app-panel--control">
+          <header class="header">
+            <p id="syncStatus" class="sync-status" hidden></p>
+          </header>
+
+          <section class="stats" aria-label="Sleep summary">
+            <div class="stat-card">
+              <div class="stat-label">Right now</div>
+              <div class="stat-value" id="sleepNowValue">Awake</div>
+              <div class="stat-hint" id="sleepNowHint"></div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Asleep today</div>
+              <div class="stat-value" id="sleepTodayValue">—</div>
+              <div class="stat-hint" id="sleepTodayHint">Total across today's sessions</div>
+            </div>
+          </section>
+
+          <section class="timer-zone">
+            <div id="sleepElapsed" class="elapsed" hidden aria-live="polite">
+              <span class="elapsed-value" id="sleepElapsedValue">0:00</span>
+              <span class="elapsed-hint">asleep</span>
+            </div>
+            <button type="button" id="sleepMainBtn" class="main-btn" aria-pressed="false">
+              <span class="main-btn-label" id="sleepMainBtnLabel">Start sleep</span>
+            </button>
+            <button type="button" id="sleepLogPastBtn" class="header-options-btn sleep-log-past-btn">
+              + Log a past sleep
+            </button>
+          </section>
+        </div>
+
+        <div class="app-panel app-panel--history">
+          <section class="history-section" aria-labelledby="sleepHistoryTitle">
+            <div class="history-toolbar">
+              <h2 id="sleepHistoryTitle" class="history-heading">Sleep sessions</h2>
+              <div class="feed-pagination" aria-label="Sleep pages">
+                <button type="button" class="feed-page-btn" id="sleepPrevPage" disabled>Prev</button>
+                <span class="feed-page-label" id="sleepPageLabel" aria-live="polite"></span>
+                <button type="button" class="feed-page-btn" id="sleepNextPage" disabled>Next</button>
+              </div>
+            </div>
+            <ul id="sleepList" class="history-list"></ul>
+            <p id="sleepEmpty" class="history-empty">No sleep sessions logged yet.</p>
+          </section>
+        </div>
+      </div>
+
+      <footer class="app-footer" aria-label="App actions">
+        <div class="app-footer-actions">
+          <button
+            type="button"
+            id="sleepClearAllBtn"
+            class="header-options-btn header-options-btn--danger app-footer-clear"
+            hidden
+            aria-label="Clear all sleep sessions"
+          >
+            Clear all sleep sessions
+          </button>
+          <div class="app-footer-trailing">
+            <button type="button" class="header-options-btn" id="signOutBtn" hidden>Sign out</button>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <dialog class="options-dialog login-dialog" id="loginDialog" aria-labelledby="loginTitle" aria-modal="true">
+      <form class="options-form" id="loginForm">
+        <h2 id="loginTitle" class="options-title">Sign in</h2>
+        <p class="options-intro">
+          Same email and password as in Supabase (Authentication → Users). Enables sync on this and other devices.
+        </p>
+        <div class="options-field">
+          <label class="options-label" for="loginEmail">Email</label>
+          <div class="options-number-wrap login-field-wrap">
+            <input
+              id="loginEmail"
+              name="email"
+              class="options-input"
+              type="email"
+              autocomplete="username"
+              required
+            />
+          </div>
+        </div>
+        <div class="options-field">
+          <label class="options-label" for="loginPassword">Password</label>
+          <div class="options-number-wrap login-field-wrap">
+            <input
+              id="loginPassword"
+              name="password"
+              class="options-input"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+        </div>
+        <p id="loginError" class="options-hint login-error" hidden></p>
+        <div class="options-actions login-actions">
+          <button type="submit" class="btn-primary login-submit" id="loginSubmit">Sign in</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="supabase-config.js"></script>
+    <script type="module" src="sleep_page.js"></script>
+  </body>
+</html>

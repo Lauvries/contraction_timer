@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { addSecondSide, deleteAllFeedsForUser, deleteFeed, insertFeed, pullFeeds, subscribeFeedsRealtime, updateFeed } from "./feeds.js";
 import { installPullToRefresh } from "./pull_to_refresh.js";
 import { waitForInitialSession } from "./auth.js";
+import { applyTabVisibility } from "./nav.js";
 
 const syncStatusEl = document.getElementById("syncStatus");
 const signOutBtn = document.getElementById("signOutBtn");
@@ -1476,6 +1477,7 @@ feedQuickLogToggle?.addEventListener("change", () => {
 setSyncMessage("");
 
 async function bootstrap() {
+  applyTabVisibility();
   installPullToRefresh();
   installDebugHooks();
   syncQuickLogHint();
